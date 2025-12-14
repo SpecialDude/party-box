@@ -1,7 +1,11 @@
+
 export enum GameScreen {
   HOME = 'HOME',
   PASS_THE_HAT = 'PASS_THE_HAT',
-  CHARADES = 'CHARADES', // Placeholder for future
+  CHARADES = 'CHARADES',
+  SCAVENGER = 'SCAVENGER',
+  TRIVIA = 'TRIVIA',
+  SPECTATOR = 'SPECTATOR', // New screen for joiners
 }
 
 export interface GameConfig {
@@ -24,4 +28,52 @@ export interface PassTheHatSettings {
   theme: string;
   useAI: boolean;
   musicUrl: string; // URL for the audio track
+}
+
+export interface ScavengerItem {
+  id: string;
+  description: string;
+  emoji: string;
+  points: number;
+  found: boolean;
+}
+
+export interface TriviaQuestion {
+  question: string;
+  answer: string;
+  category: string;
+}
+
+// --- Charades Specific Types ---
+
+export interface CharadesCard {
+  id: string;
+  word: string;
+  status: 'hidden' | 'active' | 'guessed' | 'skipped';
+}
+
+export interface CharadesTeam {
+  id: string;
+  name: string;
+  score: number;
+  color: string;
+}
+
+export type GamePhase = 'setup' | 'board' | 'acting' | 'result' | 'summary';
+
+export interface CharadesGameState {
+  roomId: string;
+  phase: GamePhase;
+  teams: CharadesTeam[];
+  currentTeamIndex: number;
+  cards: CharadesCard[];
+  
+  // Round State
+  activeCardId: string | null;
+  timeLeft: number;
+  lastResult: 'guessed' | 'skipped' | null;
+  
+  // Settings
+  category: string;
+  roundDuration: number;
 }

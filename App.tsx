@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GameScreen, GameConfig } from './types';
 import GameCard from './components/GameCard';
 import PassTheHat from './games/PassTheHat';
+import Charades from './games/Charades';
+import ScavengerHunt from './games/ScavengerHunt';
+import Trivia from './games/Trivia';
 import { Sparkles } from 'lucide-react';
 
 const GAMES: GameConfig[] = [
@@ -15,8 +18,8 @@ const GAMES: GameConfig[] = [
   },
   {
     id: 'charades',
-    name: 'AI Charades',
-    description: 'Endless AI-generated prompts for your acting skills.',
+    name: 'AI Team Charades',
+    description: 'Team vs Team. Create a deck, sync with friends, act it out!',
     icon: '🎭',
     color: '#8B5CF6', // Violet
     screen: GameScreen.CHARADES
@@ -27,7 +30,7 @@ const GAMES: GameConfig[] = [
     description: 'Real-world scavenger hunt tailored to your spot.',
     icon: '📸',
     color: '#10B981', // Emerald
-    screen: GameScreen.HOME 
+    screen: GameScreen.SCAVENGER 
   },
   {
     id: 'trivia',
@@ -35,35 +38,42 @@ const GAMES: GameConfig[] = [
     description: 'Who knows the most? Fast-paced group questions.',
     icon: '🧠',
     color: '#3B82F6', // Blue
-    screen: GameScreen.HOME
+    screen: GameScreen.TRIVIA
   }
 ];
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<GameScreen>(GameScreen.HOME);
+  const [isSpectator, setIsSpectator] = useState(false);
+
+  // Check for shared game links on load
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gameId = params.get('gameId');
+    
+    // If we have a gameId, we assume it's a Charades game for now as that's the only one with sync
+    if (gameId) {
+       setCurrentScreen(GameScreen.CHARADES);
+       setIsSpectator(true);
+    }
+  }, []);
 
   const renderScreen = () => {
     switch (currentScreen) {
       case GameScreen.PASS_THE_HAT:
         return <PassTheHat onBack={() => setCurrentScreen(GameScreen.HOME)} />;
       case GameScreen.CHARADES:
-        return (
-          <div className="flex flex-col h-full items-center justify-center p-8 text-center bg-white/50 backdrop-blur-xl rounded-[32px] border border-white/20 shadow-sm">
-             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6 animate-bounce shadow-inner">
-                <span className="text-4xl">🚧</span>
-             </div>
-             <h2 className="text-3xl font-bold text-gray-900 mb-3 game-font tracking-tight">Coming Soon</h2>
-             <p className="mb-8 text-gray-500 font-medium max-w-xs mx-auto leading-relaxed">
-               We are crafting this experience. Check back later!
-             </p>
-             <button 
-               onClick={() => setCurrentScreen(GameScreen.HOME)}
-               className="bg-black text-white px-8 py-3 rounded-full font-bold text-sm tracking-wide hover:scale-105 transition-transform shadow-lg shadow-black/20"
-             >
-               BACK TO GAMES
-             </button>
-          </div>
-        );
+        return <Charades onBack={() => {
+            setCurrentScreen(GameScreen.HOME);
+            // Clear URL param when going back home
+            const newUrl = window.location.pathname;
+            window.history.pushState({}, '', newUrl);
+            setIsSpectator(false);
+        }} isSpectator={isSpectator} />;
+      case GameScreen.SCAVENGER:
+        return <ScavengerHunt onBack={() => setCurrentScreen(GameScreen.HOME)} />;
+      case GameScreen.TRIVIA:
+        return <Trivia onBack={() => setCurrentScreen(GameScreen.HOME)} />;
       default:
         return (
           <div className="flex flex-col h-full relative z-10 overflow-hidden">
@@ -100,13 +110,7 @@ const App: React.FC = () => {
                   >
                     <GameCard 
                       game={game} 
-                      onClick={() => {
-                        if (game.screen === GameScreen.HOME && game.id !== 'pass-the-hat') {
-                           setCurrentScreen(GameScreen.CHARADES);
-                        } else {
-                          setCurrentScreen(game.screen);
-                        }
-                      }} 
+                      onClick={() => setCurrentScreen(game.screen)} 
                     />
                   </div>
                 ))}
