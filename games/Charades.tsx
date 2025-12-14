@@ -1,35 +1,116 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, Timer, ThumbsUp, ThumbsDown, RefreshCw, Play, Settings2, Users, CreditCard, Share2, Copy, Trophy } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { ChevronLeft, ThumbsUp, ThumbsDown, RefreshCw, Play, Settings2, Users, CreditCard, Share2, Trophy, Clock, ShieldCheck, Monitor } from 'lucide-react';
 import { generateCharadesWords } from '../services/geminiService';
 import { syncService } from '../services/syncService';
-import { CharadesGameState, CharadesTeam, CharadesCard, GamePhase } from '../types';
+import { CharadesGameState, CharadesTeam, CharadesCard, GamePhase, GameNotification } from '../types';
 
 // --- Configuration Constants ---
 const CATEGORIES = ["Movies", "Animals", "Jobs", "Actions", "Famous People", "Objects", "Emotions", "Cartoon Characters"];
 const TEAM_COLORS = ["#EC4899", "#3B82F6", "#10B981", "#F59E0B"]; // Pink, Blue, Green, Orange
 
-// --- Sub-Components ---
+// --- Helper Components ---
 
+const NotificationToast: React.FC<{ notifications: GameNotification[] }> = ({ notifications }) => (
+  <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-full max-w-sm px-4">
+    {notifications.map(n => (
+      <div key={n.id} className={`p-4 rounded-xl shadow-xl flex items-center justify-center font-bold text-white animate-in slide-in-from-top-2 fade-in ${
+        n.type === 'success' ? 'bg-emerald-500' : n.type === 'error' ? 'bg-rose-500' : 'bg-blue-600'
+      }`}>
+        {n.message}
+      </div>
+    ))}
+  </div>
+);
+
+// --- View Components ---
+
+/**
+ * Host View: Controls the timer validation and game flow.
+ */
+const HostView: React.FC<{ gameState: CharadesGameState; onValidate: (result: 'guessed' | 'skipped') => void }> = ({ gameState, onValidate }) => {
+  const activeCard = gameState.cards.find(c => c.id === gameState.activeCardId);
+  const activeTeam = gameState.teams[gameState.currentTeamIndex];
+
+  return (
+    <div className="flex flex-col h-full bg-slate-900 text-white p-6">
+      <div className="flex items-center justify-between mb-8 border-b border-white/10 pb-4">
+        <div className="flex items-center gap-2">
+            <ShieldCheck className="text-emerald-400" />
+            <h1 className="font-bold uppercase tracking-widest text-sm text-gray-400">Host Control</h1>
+        </div>
+        <div className="font-mono text-xs text-gray-500">Room: {gameState.roomId}</div>
+      </div>
+
+      {gameState.phase === 'board' && (
+         <div className="flex-1 flex flex-col items-center justify-center text-center opacity-50">
+            <p>Waiting for actor to select a card...</p>
+         </div>
+      )}
+
+      {(gameState.phase === 'acting' || gameState.phase === 'waiting_for_host') && (
+        <div className="flex-1 flex flex-col">
+           <div className="text-center mb-8">
+              <span className="text-gray-400 text-sm font-bold uppercase">Current Word</span>
+              <h2 className="text-5xl font-black text-white mt-2 mb-4">{activeCard?.word}</h2>
+              <div className="inline-block px-4 py-1 rounded-full bg-white/10 text-sm font-bold" style={{ color: activeTeam.color }}>
+                 {activeTeam.name} Acting
+              </div>
+           </div>
+
+           <div className="bg-black/30 rounded-3xl p-6 mb-6 flex flex-col items-center justify-center border border-white/10">
+              <Clock className={`mb-2 ${gameState.timeLeft === 0 ? 'text-rose-500 animate-pulse' : 'text-blue-400'}`} />
+              <div className={`text-6xl font-mono font-bold ${gameState.timeLeft === 0 ? 'text-rose-500' : 'text-white'}`}>
+                {gameState.timeLeft}s
+              </div>
+              {gameState.timeLeft === 0 && (
+                <p className="text-rose-400 font-bold uppercase tracking-widest text-xs mt-2">Time Expired - Waiting for Ruling</p>
+              )}
+           </div>
+
+           <div className="grid grid-cols-2 gap-4 mt-auto">
+              <button 
+                onClick={() => onValidate('skipped')}
+                className="py-6 bg-rose-500/20 border-2 border-rose-500 text-rose-500 rounded-2xl font-bold flex flex-col items-center gap-2 active:bg-rose-500 active:text-white transition-all"
+              >
+                <ThumbsDown /> Not Guessed
+              </button>
+              <button 
+                onClick={() => onValidate('guessed')}
+                className="py-6 bg-emerald-500/20 border-2 border-emerald-500 text-emerald-500 rounded-2xl font-bold flex flex-col items-center gap-2 active:bg-emerald-500 active:text-white transition-all"
+              >
+                <ThumbsUp /> Guessed Correctly
+              </button>
+           </div>
+        </div>
+      )}
+
+      {gameState.phase === 'result' && (
+        <div className="flex-1 flex items-center justify-center">
+            <h2 className="text-3xl font-bold">Result Saved</h2>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Spectator View: Passive view, sees timer but no word.
+ */
 const SpectatorView: React.FC<{ gameState: CharadesGameState }> = ({ gameState }) => {
   const activeTeam = gameState.teams[gameState.currentTeamIndex];
-  const activeCard = gameState.cards.find(c => c.id === gameState.activeCardId);
 
   return (
     <div className="flex flex-col h-full bg-slate-900 text-white p-6 justify-center items-center text-center">
       <div className="mb-8">
-        <h2 className="text-gray-400 text-sm font-bold uppercase tracking-[0.2em] mb-2">Spectating Room</h2>
-        <h1 className="text-3xl font-mono text-white">{gameState.roomId}</h1>
+        <h2 className="text-gray-400 text-xs font-bold uppercase tracking-[0.2em] mb-2 flex items-center justify-center gap-2">
+            <Monitor size={14} /> Spectator Mode
+        </h2>
       </div>
 
       {gameState.phase === 'board' && (
         <div className="animate-in fade-in">
-          <h2 className="text-2xl font-bold mb-4">Waiting for next turn...</h2>
-          <div className="flex items-center gap-2 justify-center">
-            <div className="w-3 h-3 bg-white rounded-full animate-bounce"></div>
-            <div className="w-3 h-3 bg-white rounded-full animate-bounce delay-100"></div>
-            <div className="w-3 h-3 bg-white rounded-full animate-bounce delay-200"></div>
-          </div>
+          <h2 className="text-2xl font-bold mb-4">Board View</h2>
           <div className="mt-8 p-4 bg-white/10 rounded-xl">
             <p className="text-gray-300">Up Next:</p>
             <p className="text-2xl font-bold" style={{ color: activeTeam.color }}>{activeTeam.name}</p>
@@ -37,13 +118,15 @@ const SpectatorView: React.FC<{ gameState: CharadesGameState }> = ({ gameState }
         </div>
       )}
 
-      {gameState.phase === 'acting' && (
+      {(gameState.phase === 'acting' || gameState.phase === 'waiting_for_host') && (
         <div className="w-full max-w-md animate-in zoom-in duration-300">
-           <div className="p-8 rounded-[40px] border-4 bg-black" style={{ borderColor: activeTeam.color }}>
+           <div className="p-8 rounded-[40px] border-4 bg-black relative overflow-hidden" style={{ borderColor: activeTeam.color }}>
               <p className="text-gray-400 font-bold uppercase mb-4">Acting Now</p>
               <h2 className="text-4xl font-black mb-8" style={{ color: activeTeam.color }}>{activeTeam.name}</h2>
-              <div className="text-8xl font-mono font-bold mb-4">{gameState.timeLeft}s</div>
-              <p className="text-sm text-gray-500">Guessing...</p>
+              <div className={`text-8xl font-mono font-bold mb-4 ${gameState.timeLeft < 10 ? 'text-rose-500 animate-pulse' : 'text-white'}`}>
+                  {gameState.timeLeft}s
+              </div>
+              <p className="text-sm text-gray-500 animate-pulse">Guessing...</p>
            </div>
         </div>
       )}
@@ -51,40 +134,23 @@ const SpectatorView: React.FC<{ gameState: CharadesGameState }> = ({ gameState }
       {gameState.phase === 'result' && (
         <div className="w-full max-w-md animate-in slide-in-from-bottom-10">
           <div className={`p-8 rounded-[40px] ${gameState.lastResult === 'guessed' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
-             <h2 className="text-4xl font-black mb-4">{gameState.lastResult === 'guessed' ? 'CORRECT!' : 'SKIPPED'}</h2>
+             <h2 className="text-4xl font-black mb-4">{gameState.lastResult === 'guessed' ? 'CORRECT!' : 'MISSED'}</h2>
              <div className="bg-black/20 p-6 rounded-2xl">
-               <p className="text-white/60 text-sm font-bold uppercase mb-2">The word was</p>
-               <p className="text-3xl font-bold text-white">{activeCard?.word}</p>
+                <p className="text-white/60 text-sm font-bold uppercase">Moving to next round...</p>
              </div>
           </div>
         </div>
-      )}
-
-      {gameState.phase === 'summary' && (
-         <div className="w-full max-w-md">
-            <Trophy className="w-20 h-20 text-yellow-400 mx-auto mb-6" />
-            <h2 className="text-3xl font-bold mb-6">Final Scores</h2>
-            <div className="space-y-3">
-              {[...gameState.teams].sort((a,b) => b.score - a.score).map((team, idx) => (
-                <div key={team.id} className="bg-white/10 p-4 rounded-xl flex justify-between items-center">
-                   <div className="flex items-center gap-3">
-                      <span className="font-mono text-gray-400">#{idx + 1}</span>
-                      <span className="font-bold" style={{ color: team.color }}>{team.name}</span>
-                   </div>
-                   <span className="text-2xl font-bold">{team.score}</span>
-                </div>
-              ))}
-            </div>
-         </div>
       )}
     </div>
   );
 };
 
 
-const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onBack, isSpectator = false }) => {
-  // Local state for setup forms
-  const [setupPhase, setSetupPhase] = useState(0); // 0: Settings, 1: Teams
+// --- Main Component ---
+
+const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onBack }) => {
+  // --- Local State ---
+  const [setupPhase, setSetupPhase] = useState(0); 
   const [category, setCategory] = useState("Movies");
   const [customCategory, setCustomCategory] = useState("");
   const [numCards, setNumCards] = useState(12);
@@ -94,48 +160,70 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
     { id: '2', name: 'Team 2', score: 0, color: TEAM_COLORS[1] }
   ]);
   const [isLoading, setIsLoading] = useState(false);
+  const [gameRole, setGameRole] = useState<'host' | 'player' | 'spectator' | 'setup'>('setup');
+  const [notifications, setNotifications] = useState<GameNotification[]>([]);
 
-  // Sync State
+  // --- Sync State ---
   const [gameState, setGameState] = useState<CharadesGameState | null>(null);
-  
-  // Host Timer Ref
   const timerRef = useRef<number | null>(null);
 
-  // --- Initialization & Sync ---
+  // --- Helpers ---
+  const addNotification = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
+      const id = Date.now().toString();
+      setNotifications(prev => [...prev, { id, message, type }]);
+      setTimeout(() => {
+          setNotifications(prev => prev.filter(n => n.id !== id));
+      }, 3000);
+  };
 
+  // --- Initialization & Routing ---
   useEffect(() => {
-    // Check for game ID in URL
     const params = new URLSearchParams(window.location.search);
     const gameId = params.get('gameId');
+    const role = params.get('role');
 
     if (gameId) {
-      // Subscribe to existing game
-      const cleanup = syncService.subscribe(gameId, (newState) => {
-        setGameState(newState);
-      });
-      return cleanup;
+       // Auto-connect
+       const cleanup = syncService.subscribe(gameId, (newState) => {
+          // If we receive a new state that has a different result than before, notify
+          setGameState(prev => {
+              if (prev?.phase === 'acting' && newState.phase === 'result') {
+                  if (newState.lastResult === 'guessed') addNotification("Team Scored!", "success");
+                  else addNotification("Round Missed", "error");
+              }
+              return newState;
+          });
+       });
+
+       if (role === 'host') setGameRole('host');
+       else if (role === 'spectator') setGameRole('spectator');
+       else setGameRole('player');
+       
+       return cleanup;
     }
   }, []);
 
-  // Timer Logic (Host Only)
+  // --- Host Logic: Timer Authority ---
   useEffect(() => {
-    if (!gameState || isSpectator) return;
+    if (gameRole !== 'host' || !gameState) return;
 
     if (gameState.phase === 'acting' && gameState.timeLeft > 0) {
       timerRef.current = window.setTimeout(() => {
         syncService.updateState(gameState.roomId, { timeLeft: gameState.timeLeft - 1 });
       }, 1000);
     } else if (gameState.phase === 'acting' && gameState.timeLeft === 0) {
-      handleResult('skipped');
+      // Time is up! Move to Waiting for Host
+      syncService.updateState(gameState.roomId, { phase: 'waiting_for_host' });
+      addNotification("Time's Up! Please validate result.", "error");
     }
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [gameState, isSpectator]);
+  }, [gameState?.phase, gameState?.timeLeft, gameRole]);
 
 
-  // --- Host Functions ---
+  // --- Actions ---
 
   const handleCreateGame = async () => {
     setIsLoading(true);
@@ -165,29 +253,34 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
     syncService.createRoom(roomId, initialState);
     setGameState(initialState);
     
-    // Update URL without reload so host can copy it
+    // Set self as Host
     const newUrl = new URL(window.location.href);
     newUrl.searchParams.set('gameId', roomId);
+    newUrl.searchParams.set('role', 'host');
     window.history.pushState({}, '', newUrl);
+    setGameRole('host');
     
     setIsLoading(false);
   };
 
   const handleCardClick = (cardId: string) => {
-    if (!gameState || isSpectator) return;
-    
+    if (!gameState) return;
+    // Only allow selection in board phase
+    if (gameState.phase !== 'board') return;
+
     syncService.updateState(gameState.roomId, {
       phase: 'acting',
       activeCardId: cardId,
       timeLeft: gameState.roundDuration,
       cards: gameState.cards.map(c => c.id === cardId ? { ...c, status: 'active' } : c)
     });
+    addNotification("Round Started!", "info");
   };
 
-  const handleResult = (result: 'guessed' | 'skipped') => {
+  // Host Only
+  const handleHostValidation = (result: 'guessed' | 'skipped') => {
     if (!gameState) return;
 
-    const currentTeam = gameState.teams[gameState.currentTeamIndex];
     const updatedTeams = gameState.teams.map((t, i) => {
       if (i === gameState.currentTeamIndex && result === 'guessed') {
         return { ...t, score: t.score + 1 };
@@ -195,12 +288,10 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
       return t;
     });
 
-    // Update card status
     const updatedCards = gameState.cards.map(c => 
       c.id === gameState.activeCardId ? { ...c, status: result } : c
     );
 
-    // Show result briefly
     syncService.updateState(gameState.roomId, {
       phase: 'result',
       lastResult: result,
@@ -208,14 +299,13 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
       cards: updatedCards
     });
 
-    // Determine next state
+    // Auto transition after result
     setTimeout(() => {
         // Check if all cards done
         const allDone = updatedCards.every(c => c.status === 'guessed' || c.status === 'skipped');
         if (allDone) {
              syncService.updateState(gameState.roomId, { phase: 'summary' });
         } else {
-            // Next Team
             const nextIndex = (gameState.currentTeamIndex + 1) % gameState.teams.length;
             syncService.updateState(gameState.roomId, {
                 phase: 'board',
@@ -224,17 +314,41 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
                 timeLeft: gameState.roundDuration
             });
         }
-    }, 3000); // Show result for 3 seconds
+    }, 3000);
   };
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    alert("Spectator Link Copied!");
+  const copyLink = (role: 'player' | 'spectator') => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('role', role);
+    navigator.clipboard.writeText(url.toString());
+    addNotification(`${role === 'player' ? 'Player' : 'Spectator'} link copied!`, "success");
   };
 
-  // --- Renders ---
+  // --- Dynamic Grid Calculation ---
+  const gridStyle = useMemo(() => {
+    if (!gameState) return {};
+    const count = gameState.cards.length;
+    // Calculate cols based on count to keep it roughly square or landscape-ish
+    // 4 cards -> 2x2, 6 -> 3x2, 12 -> 3x4 or 4x3.
+    // We want to ensure it fits in viewport height.
+    let cols = 3;
+    if (count <= 4) cols = 2;
+    else if (count <= 9) cols = 3;
+    else if (count <= 16) cols = 4;
+    else cols = 5;
 
-  // 1. Loading
+    return {
+       display: 'grid',
+       gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+       gap: '0.75rem',
+       height: '100%',
+       alignContent: 'center' // Vertically center the whole grid content
+    };
+  }, [gameState?.cards.length]);
+
+
+  // --- RENDERERS ---
+
   if (isLoading) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-[#8B5CF6] text-white">
@@ -244,8 +358,8 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
     );
   }
 
-  // 2. Setup (Host Only)
-  if (!gameState && !isSpectator) {
+  // 1. SETUP (New Game)
+  if (gameRole === 'setup') {
     return (
       <div className="flex flex-col h-full bg-[#8B5CF6] text-white overflow-hidden">
         <div className="flex items-center p-6 pb-2">
@@ -291,11 +405,15 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
            <div className="bg-purple-800/40 p-5 rounded-2xl border border-purple-500/30">
                <h3 className="font-bold uppercase tracking-wider text-sm flex items-center gap-2 mb-4"><CreditCard size={16}/> Deck Size: {numCards}</h3>
                <input 
-                 type="range" min="4" max="30" step="2"
+                 type="range" min="4" max="24" step="2"
                  value={numCards}
                  onChange={(e) => setNumCards(Number(e.target.value))}
                  className="w-full h-2 bg-purple-900 rounded-lg appearance-none cursor-pointer accent-white"
                />
+               <div className="flex justify-between text-xs text-purple-200 mt-2 font-mono">
+                  <span>4 Cards</span>
+                  <span>24 Cards</span>
+               </div>
            </div>
 
            {/* Section 3: Topic */}
@@ -330,7 +448,7 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
     );
   }
 
-  // 3. Spectator Wait Screen / Loading into existing game
+  // Waiting for connection
   if (!gameState) {
     return (
         <div className="h-full flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center">
@@ -341,152 +459,150 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
     );
   }
 
-  // 4. Spectator Active View
-  if (isSpectator) {
-    return <SpectatorView gameState={gameState} />;
-  }
-
-  // 5. Host Gameplay View
-  const activeTeam = gameState.teams[gameState.currentTeamIndex];
-
-  if (gameState.phase === 'board') {
-    return (
-       <div className="flex flex-col h-full bg-[#8B5CF6] text-white">
-          {/* Header Bar */}
-          <div className="px-6 py-4 flex items-center justify-between bg-black/10 backdrop-blur-md">
-             <div>
-                <h2 className="text-xs font-bold opacity-60 uppercase tracking-widest">Current Turn</h2>
-                <div className="text-xl font-bold flex items-center gap-2">
-                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activeTeam.color }}></div>
-                   {activeTeam.name}
-                </div>
-             </div>
-             <button onClick={copyLink} className="p-2 bg-white/10 rounded-full hover:bg-white/20">
-                <Share2 size={18} />
-             </button>
-          </div>
-
-          {/* Scoreboard Strip */}
-          <div className="flex items-center gap-4 px-6 py-2 overflow-x-auto no-scrollbar border-b border-white/10">
-             {gameState.teams.map(t => (
-                <div key={t.id} className={`flex items-center gap-2 px-3 py-1 rounded-full ${t.id === activeTeam.id ? 'bg-white/20' : ''}`}>
-                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: t.color }}></div>
-                   <span className="text-xs font-bold">{t.score}</span>
-                </div>
-             ))}
-          </div>
-
-          {/* Card Grid */}
-          <div className="flex-1 overflow-y-auto p-6">
-             <div className="grid grid-cols-3 gap-3">
-                {gameState.cards.map((card) => (
-                   <button
-                     key={card.id}
-                     disabled={card.status !== 'hidden'}
-                     onClick={() => handleCardClick(card.id)}
-                     className={`aspect-[3/4] rounded-xl flex items-center justify-center transition-all duration-500 relative transform ${
-                        card.status === 'hidden' 
-                        ? 'bg-white text-purple-600 shadow-lg hover:scale-105 cursor-pointer' 
-                        : 'bg-black/20 opacity-50 cursor-default'
-                     }`}
-                   >
-                      {card.status === 'hidden' ? (
-                         <span className="text-2xl font-black opacity-20">?</span>
-                      ) : (
-                         <div className={`absolute inset-0 rounded-xl flex items-center justify-center ${
-                             card.status === 'guessed' ? 'bg-emerald-500/80' : 'bg-rose-500/80'
-                         }`}>
-                             {card.status === 'guessed' ? <ThumbsUp className="text-white"/> : <ThumbsDown className="text-white"/>}
-                         </div>
-                      )}
-                   </button>
-                ))}
-             </div>
-          </div>
-       </div>
-    );
-  }
-
-  if (gameState.phase === 'acting' || gameState.phase === 'result') {
-      const card = gameState.cards.find(c => c.id === gameState.activeCardId);
-      return (
-         <div className="flex flex-col h-full bg-slate-900 text-white relative">
-            {/* Overlay Result */}
-            {gameState.phase === 'result' && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                    <div className="text-center">
-                        <h1 className={`text-5xl font-black mb-4 ${gameState.lastResult === 'guessed' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {gameState.lastResult === 'guessed' ? 'NICE!' : 'MISSED'}
-                        </h1>
-                        <p className="text-white text-2xl font-bold">{card?.word}</p>
-                    </div>
-                </div>
-            )}
-
-            <div className="h-16 flex items-center justify-between px-6 bg-white/5">
-                <div className="flex items-center gap-2">
-                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activeTeam.color }}></div>
-                   <span className="font-bold">{activeTeam.name} Acting</span>
-                </div>
-                <div className={`font-mono text-2xl font-bold ${gameState.timeLeft < 10 ? 'text-rose-500 animate-pulse' : 'text-white'}`}>
-                    {gameState.timeLeft}s
-                </div>
-            </div>
-
-            <div className="flex-1 flex items-center justify-center p-8">
-               <div className="w-full aspect-[3/4] max-h-[50vh] bg-white rounded-[40px] flex items-center justify-center p-6 text-center shadow-2xl animate-pop">
-                  <span className="text-5xl font-black text-slate-900 break-words leading-tight">{card?.word}</span>
-               </div>
-            </div>
-
-            <div className="p-6 grid grid-cols-2 gap-4">
-               <button 
-                 onClick={() => handleResult('skipped')}
-                 className="py-6 bg-rose-500 rounded-3xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform"
-               >
-                  <ThumbsDown size={32} />
-                  <span className="font-bold uppercase tracking-widest">Pass</span>
-               </button>
-               <button 
-                 onClick={() => handleResult('guessed')}
-                 className="py-6 bg-emerald-500 rounded-3xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform"
-               >
-                  <ThumbsUp size={32} />
-                  <span className="font-bold uppercase tracking-widest">Got it!</span>
-               </button>
-            </div>
-         </div>
-      );
-  }
-
-  // Summary
+  // Common UI Wrapper
   return (
-    <div className="flex flex-col h-full bg-[#8B5CF6] text-white p-6 items-center justify-center text-center">
-         <Trophy size={64} className="text-yellow-300 mb-6 animate-bounce" />
-         <h1 className="text-4xl font-black mb-8 game-font">Game Over!</h1>
-         
-         <div className="w-full max-w-sm space-y-4 mb-8">
-             {[...gameState.teams].sort((a,b) => b.score - a.score).map((team, idx) => (
-                 <div key={team.id} className="bg-white/10 p-4 rounded-2xl flex justify-between items-center border border-white/10">
-                    <div className="flex items-center gap-3">
-                         {idx === 0 && <span className="text-2xl">👑</span>}
-                         <span className="font-bold text-lg" style={{ color: team.color }}>{team.name}</span>
-                    </div>
-                    <span className="text-3xl font-bold">{team.score}</span>
-                 </div>
-             ))}
-         </div>
+    <div className="h-full relative overflow-hidden">
+      <NotificationToast notifications={notifications} />
 
-         <button 
-           onClick={() => {
-             // Reset by going back to setup
-             setGameState(null);
-             window.history.pushState({}, '', window.location.pathname); // Clear URL param
-           }}
-           className="px-8 py-4 bg-white text-purple-600 rounded-full font-bold shadow-xl"
-         >
-            Play New Game
-         </button>
+      {/* 2. SPECTATOR MODE */}
+      {gameRole === 'spectator' && <SpectatorView gameState={gameState} />}
+
+      {/* 3. HOST MODE */}
+      {gameRole === 'host' && (
+        <div className="flex flex-col h-full">
+            <HostView gameState={gameState} onValidate={handleHostValidation} />
+            {/* Host Actions Footer */}
+            {gameState.phase !== 'summary' && (
+              <div className="bg-slate-800 p-4 border-t border-white/10 flex justify-center gap-4">
+                  <button onClick={() => copyLink('player')} className="px-4 py-2 bg-white/10 rounded-full text-xs font-bold text-gray-300 flex items-center gap-2 hover:bg-white/20">
+                      <Share2 size={12} /> Copy Player Link
+                  </button>
+                  <button onClick={() => copyLink('spectator')} className="px-4 py-2 bg-white/10 rounded-full text-xs font-bold text-gray-300 flex items-center gap-2 hover:bg-white/20">
+                      <Monitor size={12} /> Copy Spectator Link
+                  </button>
+              </div>
+            )}
+        </div>
+      )}
+
+      {/* 4. PLAYER MODE (Board & Actor) */}
+      {gameRole === 'player' && (
+        <>
+           {/* Header Bar */}
+           <div className="h-14 flex items-center justify-between px-6 bg-[#8B5CF6] text-white shadow-sm z-10 relative">
+               <div className="flex items-center gap-2">
+                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: gameState.teams[gameState.currentTeamIndex].color }}></div>
+                   <span className="font-bold">{gameState.teams[gameState.currentTeamIndex].name} Turn</span>
+               </div>
+               <div className="font-mono font-bold bg-black/20 px-3 py-1 rounded-full text-sm">
+                   Team Score: {gameState.teams[gameState.currentTeamIndex].score}
+               </div>
+           </div>
+
+           {/* MAIN GAMEPLAY AREA */}
+           <div className="flex-1 bg-slate-100 p-4 overflow-hidden relative">
+              
+              {/* BOARD PHASE */}
+              {gameState.phase === 'board' && (
+                  <div style={gridStyle} className="animate-in fade-in zoom-in duration-300">
+                      {gameState.cards.map((card) => (
+                        <button
+                            key={card.id}
+                            disabled={card.status !== 'hidden'}
+                            onClick={() => handleCardClick(card.id)}
+                            className={`rounded-xl flex items-center justify-center relative shadow-sm transition-all active:scale-95 ${
+                                card.status === 'hidden' 
+                                ? 'bg-white text-[#8B5CF6] hover:shadow-md border-b-4 border-gray-200 hover:-translate-y-1' 
+                                : 'bg-gray-200 border-none'
+                            }`}
+                        >
+                            {card.status === 'hidden' ? (
+                                <span className="text-xl font-black opacity-20">?</span>
+                            ) : (
+                                <div className={`absolute inset-0 rounded-xl flex items-center justify-center ${
+                                    card.status === 'guessed' ? 'bg-emerald-500/80 text-white' : 'bg-rose-500/80 text-white'
+                                }`}>
+                                    {card.status === 'guessed' ? <ThumbsUp size={20} /> : <ThumbsDown size={20} />}
+                                </div>
+                            )}
+                        </button>
+                      ))}
+                  </div>
+              )}
+
+              {/* ACTING PHASE (Actor View) */}
+              {(gameState.phase === 'acting' || gameState.phase === 'waiting_for_host') && (
+                 <div className="absolute inset-0 bg-slate-900 text-white flex flex-col items-center justify-center p-6 animate-in slide-in-from-bottom">
+                     <div className="w-full max-w-md bg-white text-slate-900 rounded-[3rem] aspect-[4/5] flex flex-col items-center justify-center p-8 text-center shadow-2xl relative overflow-hidden">
+                        {/* Timer Overlay */}
+                        <div className="absolute top-0 w-full bg-slate-900 py-3 text-white font-mono font-bold text-xl">
+                            {gameState.timeLeft}s
+                        </div>
+                        
+                        <p className="text-gray-400 font-bold uppercase tracking-widest text-sm mb-4 mt-8">Your Word</p>
+                        <h2 className="text-5xl font-black break-words leading-tight">{gameState.cards.find(c => c.id === gameState.activeCardId)?.word}</h2>
+                        
+                        {gameState.phase === 'waiting_for_host' && (
+                             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+                                <div className="text-white text-center">
+                                    <Clock size={48} className="mx-auto mb-4 text-rose-500 animate-pulse" />
+                                    <h3 className="text-2xl font-bold">Time's Up!</h3>
+                                    <p className="text-gray-400">Waiting for Host validation...</p>
+                                </div>
+                             </div>
+                        )}
+                     </div>
+                 </div>
+              )}
+
+               {/* RESULT OVERLAY */}
+               {gameState.phase === 'result' && (
+                  <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                      <div className="text-center">
+                          <h1 className={`text-5xl font-black mb-4 ${gameState.lastResult === 'guessed' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {gameState.lastResult === 'guessed' ? 'NICE!' : 'MISSED'}
+                          </h1>
+                          <p className="text-white text-xl font-bold opacity-60">Prepare for next round...</p>
+                      </div>
+                  </div>
+              )}
+           </div>
+        </>
+      )}
+
+      {/* 5. SUMMARY SCREEN (Shared) */}
+      {gameState.phase === 'summary' && (
+         <div className="absolute inset-0 bg-[#8B5CF6] text-white flex flex-col items-center justify-center p-6 text-center z-[60]">
+             <Trophy size={64} className="text-yellow-300 mb-6 animate-bounce" />
+             <h1 className="text-4xl font-black mb-8 game-font">Game Over!</h1>
+             
+             <div className="w-full max-w-sm space-y-4 mb-8">
+                 {[...gameState.teams].sort((a,b) => b.score - a.score).map((team, idx) => (
+                     <div key={team.id} className="bg-white/10 p-4 rounded-2xl flex justify-between items-center border border-white/10">
+                        <div className="flex items-center gap-3">
+                             {idx === 0 && <span className="text-2xl">👑</span>}
+                             <span className="font-bold text-lg" style={{ color: team.color }}>{team.name}</span>
+                        </div>
+                        <span className="text-3xl font-bold">{team.score}</span>
+                     </div>
+                 ))}
+             </div>
+
+             {gameRole === 'host' && (
+               <button 
+                 onClick={() => {
+                   setGameState(null);
+                   setGameRole('setup');
+                   // Reset URL
+                   window.history.pushState({}, '', window.location.pathname);
+                 }}
+                 className="px-8 py-4 bg-white text-purple-600 rounded-full font-bold shadow-xl active:scale-95"
+               >
+                  Play New Game
+               </button>
+             )}
+         </div>
+      )}
     </div>
   );
 };

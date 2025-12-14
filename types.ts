@@ -59,7 +59,7 @@ export interface CharadesTeam {
   color: string;
 }
 
-export type GamePhase = 'setup' | 'board' | 'acting' | 'result' | 'summary';
+export type GamePhase = 'setup' | 'board' | 'acting' | 'waiting_for_host' | 'result' | 'summary';
 
 export interface CharadesGameState {
   roomId: string;
@@ -76,4 +76,10 @@ export interface CharadesGameState {
   // Settings
   category: string;
   roundDuration: number;
+}
+
+export interface GameNotification {
+  id: string;
+  message: string;
+  type: 'info' | 'success' | 'error';
 }
