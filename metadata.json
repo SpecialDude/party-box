@@ -1,0 +1,7 @@
+{
+  "name": "Picnic Party Box",
+  "description": "A collection of fun group activities and game facilitators for outdoor picnics and parties. Features AI-powered challenges.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
