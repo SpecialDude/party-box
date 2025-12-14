@@ -5,7 +5,7 @@ export enum GameScreen {
   CHARADES = 'CHARADES',
   SCAVENGER = 'SCAVENGER',
   TRIVIA = 'TRIVIA',
-  SPECTATOR = 'SPECTATOR', // New screen for joiners
+  SPECTATOR = 'SPECTATOR',
 }
 
 export interface GameConfig {
@@ -70,6 +70,7 @@ export interface CharadesGameState {
   
   // Round State
   activeCardId: string | null;
+  actorId?: string; // ID of the player currently acting
   timeLeft: number;
   lastResult: 'guessed' | 'skipped' | null;
   

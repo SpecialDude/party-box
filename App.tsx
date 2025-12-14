@@ -5,7 +5,8 @@ import PassTheHat from './games/PassTheHat';
 import Charades from './games/Charades';
 import ScavengerHunt from './games/ScavengerHunt';
 import Trivia from './games/Trivia';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, ArrowRight } from 'lucide-react';
+import { syncService } from './services/syncService';
 
 const GAMES: GameConfig[] = [
   {
@@ -45,6 +46,8 @@ const GAMES: GameConfig[] = [
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<GameScreen>(GameScreen.HOME);
   const [isSpectator, setIsSpectator] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
 
   // Check for shared game links on load
   useEffect(() => {
@@ -54,9 +57,31 @@ const App: React.FC = () => {
     // If we have a gameId, we assume it's a Charades game for now as that's the only one with sync
     if (gameId) {
        setCurrentScreen(GameScreen.CHARADES);
-       setIsSpectator(true);
+       // If coming from link without specific role, assume spectator or player logic handled in Charades.tsx
     }
   }, []);
+
+  const handleJoinGame = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (joinCode.length < 4) return;
+    
+    setIsJoining(true);
+    const code = joinCode.toUpperCase();
+    const exists = await syncService.checkRoomExists(code);
+    
+    if (exists) {
+      // Update URL without reloading
+      const url = new URL(window.location.href);
+      url.searchParams.set('gameId', code);
+      url.searchParams.set('role', 'player'); // Default to player
+      window.history.pushState({}, '', url);
+      
+      setCurrentScreen(GameScreen.CHARADES);
+    } else {
+      alert("Room not found! Check the code.");
+    }
+    setIsJoining(false);
+  };
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -69,6 +94,7 @@ const App: React.FC = () => {
             const newUrl = window.location.pathname;
             window.history.pushState({}, '', newUrl);
             setIsSpectator(false);
+            setJoinCode('');
         }} isSpectator={isSpectator} />;
       case GameScreen.SCAVENGER:
         return <ScavengerHunt onBack={() => setCurrentScreen(GameScreen.HOME)} />;
@@ -96,6 +122,26 @@ const App: React.FC = () => {
               <p className="text-gray-500 font-medium text-sm sm:text-base max-w-md leading-relaxed">
                 The ultimate toolkit for your hangouts.
               </p>
+            </div>
+
+            {/* JOIN GAME SECTION */}
+            <div className="px-6 sm:px-8 mb-4">
+              <form onSubmit={handleJoinGame} className="flex gap-2 max-w-sm">
+                 <input 
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                    placeholder="Enter 4-Letter Room Code"
+                    maxLength={5}
+                    className="flex-1 bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono font-bold uppercase placeholder:text-gray-300 outline-none focus:border-violet-500 transition-all"
+                 />
+                 <button 
+                   type="submit"
+                   disabled={isJoining || joinCode.length < 4}
+                   className="bg-black text-white px-4 rounded-xl flex items-center justify-center hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                 >
+                   {isJoining ? '...' : <ArrowRight />}
+                 </button>
+              </form>
             </div>
 
             {/* Horizontal Scroll Games - Fixed area */}

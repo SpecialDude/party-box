@@ -1,52 +1,50 @@
-
+import { ref, set, update, onValue, get, child } from "firebase/database";
+import { db } from "../firebaseConfig";
 import { CharadesGameState } from "../types";
-
-// NOTE: In a real production app, this would use Firebase Realtime Database or Firestore.
-// For this demo, we use localStorage + 'storage' event listener to simulate synchronization
-// between tabs/windows on the same device.
-
-const STORAGE_PREFIX = "partybox_room_";
 
 export const syncService = {
   
-  // Host creates a room
-  createRoom: (roomId: string, initialState: CharadesGameState) => {
-    localStorage.setItem(STORAGE_PREFIX + roomId, JSON.stringify(initialState));
-    // Also set as current active game for this client
-    localStorage.setItem("partybox_current_game_id", roomId);
+  // Host creates a room with a 4-letter code
+  createRoom: async (roomId: string, initialState: CharadesGameState) => {
+    try {
+      const roomRef = ref(db, `rooms/${roomId}`);
+      await set(roomRef, initialState);
+      return true;
+    } catch (error) {
+      console.error("Error creating room:", error);
+      return false;
+    }
   },
 
-  // Update state (Broadcast)
+  // Check if a room exists before joining
+  checkRoomExists: async (roomId: string): Promise<boolean> => {
+    try {
+      const dbRef = ref(db);
+      const snapshot = await get(child(dbRef, `rooms/${roomId}`));
+      return snapshot.exists();
+    } catch (error) {
+      console.error("Error checking room:", error);
+      return false;
+    }
+  },
+
+  // Update specific parts of the state (low latency)
   updateState: (roomId: string, newState: Partial<CharadesGameState>) => {
-    const key = STORAGE_PREFIX + roomId;
-    const currentStr = localStorage.getItem(key);
-    if (!currentStr) return;
-
-    const current = JSON.parse(currentStr) as CharadesGameState;
-    const updated = { ...current, ...newState };
-    
-    localStorage.setItem(key, JSON.stringify(updated));
+    const roomRef = ref(db, `rooms/${roomId}`);
+    update(roomRef, newState).catch(err => console.error("Update failed", err));
   },
 
-  // Subscribe to changes (React Effect Hook Helper)
+  // Real-time subscription
   subscribe: (roomId: string, callback: (state: CharadesGameState) => void) => {
-    // Initial read
-    const current = localStorage.getItem(STORAGE_PREFIX + roomId);
-    if (current) callback(JSON.parse(current));
-
-    const handler = (e: StorageEvent) => {
-      if (e.key === STORAGE_PREFIX + roomId && e.newValue) {
-        callback(JSON.parse(e.newValue));
+    const roomRef = ref(db, `rooms/${roomId}`);
+    
+    const unsubscribe = onValue(roomRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        callback(data as CharadesGameState);
       }
-    };
+    });
 
-    window.addEventListener('storage', handler);
-    return () => window.removeEventListener('storage', handler);
-  },
-
-  // For "poll" based fallback if storage events are flaky in some browsers
-  getSnapshot: (roomId: string): CharadesGameState | null => {
-    const data = localStorage.getItem(STORAGE_PREFIX + roomId);
-    return data ? JSON.parse(data) : null;
+    return unsubscribe; // Return cleanup function
   }
 };
