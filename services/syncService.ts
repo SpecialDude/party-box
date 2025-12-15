@@ -1,6 +1,7 @@
+
 import { ref, set, update, onValue, get, child } from "firebase/database";
 import { db } from "../firebaseConfig";
-import { CharadesGameState } from "../types";
+import { CharadesGameState, CharadesCard, CharadesTeam } from "../types";
 
 export const syncService = {
   
@@ -34,17 +35,29 @@ export const syncService = {
     update(roomRef, newState).catch(err => console.error("Update failed", err));
   },
 
-  // Real-time subscription
+  // Real-time subscription with Data Sanitization
   subscribe: (roomId: string, callback: (state: CharadesGameState) => void) => {
     const roomRef = ref(db, `rooms/${roomId}`);
     
     const unsubscribe = onValue(roomRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        callback(data as CharadesGameState);
+        // SANITIZATION: Firebase might return arrays as objects (e.g. {0:.., 1:..})
+        // We force them back to arrays to prevent .map() crashes
+        const sanitizedState: CharadesGameState = {
+            ...data,
+            cards: data.cards ? Object.values(data.cards) as CharadesCard[] : [],
+            teams: data.teams ? Object.values(data.teams) as CharadesTeam[] : []
+        };
+        callback(sanitizedState);
+      } else {
+        // Handle case where data is null (room deleted or empty)
+         console.warn("Received null data for room");
       }
+    }, (error) => {
+        console.error("Firebase Subscribe Error:", error);
     });
 
-    return unsubscribe; // Return cleanup function
+    return unsubscribe;
   }
 };
