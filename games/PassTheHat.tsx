@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Play, Square, RefreshCw, AlertTriangle, Wand2, Music, Check, ChevronLeft, Volume2, AlignLeft } from 'lucide-react';
+import { Settings, Play, Square, RefreshCw, AlertTriangle, Wand2, Music, Check, ChevronLeft, Volume2, AlignLeft, Disc } from 'lucide-react';
 import { generateChallenge } from '../services/geminiService';
 import { PassTheHatSettings, ChallengeResponse } from '../types';
 
@@ -288,7 +289,7 @@ const PassTheHat: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   className="relative w-64 h-64 rounded-full flex items-center justify-center shadow-2xl bg-black"
                   // Use explicit inline styles for animation to ensure it works reliably
                   style={{ 
-                    animation: 'spin 2s linear infinite',
+                    animation: 'spin 1.5s linear infinite', // Speeded up slightly for better effect
                     animationPlayState: isPlaying ? 'running' : 'paused'
                   }}
                >
@@ -299,7 +300,10 @@ const PassTheHat: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                    
                    {/* Center Label */}
                    <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-yellow-300 to-orange-400 flex items-center justify-center shadow-lg z-10">
-                      <div className="w-3 h-3 bg-black rounded-full"></div>
+                      <div className="w-3 h-3 bg-black rounded-full absolute"></div>
+                      <Disc size={40} className="text-black/20 animate-pulse" /> 
+                      {/* Added an icon here to make rotation more obvious */}
+                      <span className="absolute bottom-4 text-[6px] font-bold text-black/40 tracking-widest uppercase">Party Box</span>
                    </div>
                </div>
 
