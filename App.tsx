@@ -180,7 +180,12 @@ const App: React.FC = () => {
             {/* Brand Footer - Static Flex Item */}
             <div className="shrink-0 pb-6 pt-2 flex justify-center items-center gap-3 opacity-60 z-20">
                <span className="h-px w-8 bg-gray-400"></span>
-               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.25em]">Powered by Google Gemini</span>
+               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.25em] flex items-center gap-1">
+                  Powered by 
+                  <a href="https://lovenotesai.site/" target="_blank" rel="noopener noreferrer" className="hover:text-pink-600 transition-colors inline-flex items-center gap-1">
+                    💌LoveNotes AI
+                  </a>
+               </span>
                <span className="h-px w-8 bg-gray-400"></span>
             </div>
           </div>

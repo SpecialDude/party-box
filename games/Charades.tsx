@@ -378,7 +378,8 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
        
        return () => { if (unsubscribe) unsubscribe(); };
     }
-  }, [isSpectator]);
+    // CRITICAL FIX: Added gameRole to dependencies so when host creates game and role changes, subscription fires.
+  }, [isSpectator, gameRole]);
 
   // Host timer check
   useEffect(() => {
