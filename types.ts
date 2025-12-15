@@ -71,7 +71,7 @@ export interface CharadesGameState {
   // Round State
   activeCardId: string | null;
   actorId?: string; // ID of the player currently acting
-  timeLeft: number;
+  roundEndsAt: number | null; // Timestamp (Date.now()) when round ends. Null if not timer active.
   lastResult: 'guessed' | 'skipped' | null;
   
   // Settings
