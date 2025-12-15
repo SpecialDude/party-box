@@ -7,8 +7,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
-      // Polyfill process.env for the existing code structure
-      'process.env.API_KEY': JSON.stringify(env.VITE_API_KEY || env.API_KEY),
+      // Map the VITE_GEMINI_API_KEY to process.env.API_KEY 
+      // to satisfy the Google GenAI SDK requirements.
+      'process.env.API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY),
     },
   };
 });
