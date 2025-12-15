@@ -51,6 +51,7 @@ export interface CharadesCard {
   id: string;
   word: string;
   status: 'hidden' | 'active' | 'guessed' | 'skipped';
+  teamId?: string; // The ID of the team that played this card
 }
 
 export interface CharadesTeam {

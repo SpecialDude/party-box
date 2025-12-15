@@ -236,22 +236,32 @@ const SpectatorStage: React.FC<{ gameState: CharadesGameState }> = ({ gameState 
                 {history.length === 0 && (
                     <p className="text-center text-gray-600 text-xs py-4">No cards played yet</p>
                 )}
-                {history.map((card) => (
-                    <div key={card.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5 animate-in slide-in-from-right fade-in duration-300">
-                        <span className="font-medium text-sm text-gray-300">{card.word}</span>
-                        {card.status === 'guessed' ? (
-                            <div className="flex items-center gap-1 text-emerald-400 text-xs font-bold uppercase">
-                                <span>+1</span>
-                                <Check size={16} />
+                {history.map((card) => {
+                    const cardTeam = gameState.teams.find(t => t.id === card.teamId);
+                    return (
+                        <div key={card.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5 animate-in slide-in-from-right fade-in duration-300">
+                            <div className="flex flex-col gap-0.5">
+                                <span className="font-medium text-sm text-gray-300">{card.word}</span>
+                                {cardTeam && (
+                                    <span className="text-[10px] font-bold uppercase opacity-80" style={{ color: cardTeam.color }}>
+                                        {cardTeam.name}
+                                    </span>
+                                )}
                             </div>
-                        ) : (
-                            <div className="flex items-center gap-1 text-rose-400 text-xs font-bold uppercase">
-                                <span>Skip</span>
-                                <XCircle size={16} />
-                            </div>
-                        )}
-                    </div>
-                ))}
+                            {card.status === 'guessed' ? (
+                                <div className="flex items-center gap-1 text-emerald-400 text-xs font-bold uppercase">
+                                    <span>+1</span>
+                                    <Check size={16} />
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-1 text-rose-400 text-xs font-bold uppercase">
+                                    <span>Skip</span>
+                                    <XCircle size={16} />
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
          </div>
          
@@ -470,6 +480,8 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
   const handleHostValidation = (result: 'guessed' | 'skipped') => {
     if (!gameState) return;
 
+    const currentTeam = gameState.teams[gameState.currentTeamIndex];
+
     const updatedTeams = gameState.teams.map((t, i) => {
       if (i === gameState.currentTeamIndex && result === 'guessed') {
         return { ...t, score: t.score + 1 };
@@ -477,8 +489,9 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
       return t;
     });
 
+    // Capture the team ID for history
     const updatedCards = gameState.cards.map(c => 
-      c.id === gameState.activeCardId ? { ...c, status: result } : c
+      c.id === gameState.activeCardId ? { ...c, status: result, teamId: currentTeam.id } : c
     );
 
     syncService.updateState(gameState.roomId, {
