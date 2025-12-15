@@ -91,7 +91,14 @@ const HostController: React.FC<{
         <div className="flex-1 flex flex-col max-h-full">
            <div className="text-center mb-4 flex-1 flex flex-col justify-center bg-white/5 rounded-3xl p-4 border border-white/10 relative overflow-hidden">
               <span className="text-gray-400 text-xs font-bold uppercase block mb-2">The Word Is</span>
-              <h2 className="text-3xl sm:text-5xl font-black text-white mb-4 leading-tight break-words">{activeCard?.word || '???'}</h2>
+              {activeCard ? (
+                <h2 className="text-3xl sm:text-5xl font-black text-white mb-4 leading-tight break-words">{activeCard.word}</h2>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                    <RefreshCw className="animate-spin text-gray-500" />
+                    <span className="text-gray-500 text-sm">Syncing card...</span>
+                </div>
+              )}
               
               <div className="flex items-center justify-center gap-2 mb-4 bg-black/30 w-fit mx-auto px-4 py-1 rounded-full">
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: activeTeam.color }}></div>

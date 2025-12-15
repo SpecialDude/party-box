@@ -9,7 +9,9 @@ export const syncService = {
   createRoom: async (roomId: string, initialState: CharadesGameState) => {
     try {
       const roomRef = ref(db, `rooms/${roomId}`);
-      await set(roomRef, initialState);
+      // Sanitize undefined values before setting
+      const cleanState = JSON.parse(JSON.stringify(initialState));
+      await set(roomRef, cleanState);
       return true;
     } catch (error) {
       console.error("Error creating room:", error);
@@ -31,8 +33,11 @@ export const syncService = {
 
   // Update specific parts of the state (low latency)
   updateState: (roomId: string, newState: Partial<CharadesGameState>) => {
+    // Firebase update fails if data contains 'undefined'. 
+    // We sanitize the object to remove undefined keys.
+    const cleanState = JSON.parse(JSON.stringify(newState));
     const roomRef = ref(db, `rooms/${roomId}`);
-    update(roomRef, newState).catch(err => console.error("Update failed", err));
+    update(roomRef, cleanState).catch(err => console.error("Update failed", err));
   },
 
   // Real-time subscription with Data Sanitization
