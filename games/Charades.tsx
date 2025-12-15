@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ThumbsUp, ThumbsDown, RefreshCw, Play, Settings2, Users, CreditCard, Share2, Trophy, Clock, ShieldCheck, Monitor, EyeOff, XCircle, User, Zap, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ChevronLeft, ThumbsUp, ThumbsDown, RefreshCw, Play, Settings2, Users, CreditCard, Share2, Trophy, Clock, ShieldCheck, Monitor, EyeOff, XCircle, Zap, Check } from 'lucide-react';
 import { generateCharadesWords } from '../services/geminiService';
 import { syncService } from '../services/syncService';
 import { CharadesGameState, CharadesTeam, CharadesCard, GameNotification } from '../types';
@@ -176,6 +176,41 @@ const SpectatorStage: React.FC<{ gameState: CharadesGameState }> = ({ gameState 
       )}
     </div>
   );
+};
+
+// Extracted Actor Component to safely usage of hooks
+const ActorView: React.FC<{ 
+    word: string; 
+    roundEndsAt: number | null; 
+    isWaiting: boolean; 
+}> = ({ word, roundEndsAt, isWaiting }) => {
+    const timeLeft = useGameTimer(roundEndsAt);
+
+    return (
+        <div className="absolute inset-0 bg-slate-900 text-white flex flex-col items-center justify-center p-6 animate-in slide-in-from-bottom z-30">
+            <div className="w-full max-w-md bg-white text-slate-900 rounded-[32px] aspect-[3/4] flex flex-col items-center justify-center p-8 text-center shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 w-full bg-slate-900 py-3 text-white font-mono font-bold text-xl flex items-center justify-center gap-2">
+                    <Clock size={18} /> {timeLeft}s
+                </div>
+                
+                <p className="text-gray-400 font-bold uppercase tracking-widest text-xs mb-4 mt-8">Your Word</p>
+                <h2 className="text-4xl sm:text-5xl font-black break-words leading-tight">{word}</h2>
+                
+                {isWaiting && (
+                    <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6">
+                        <div className="text-white text-center">
+                            <div className="w-16 h-16 rounded-full border-4 border-rose-500 flex items-center justify-center mx-auto mb-4">
+                                <span className="text-2xl font-bold text-rose-500">0</span>
+                            </div>
+                            <h3 className="text-2xl font-bold">Time's Up!</h3>
+                            <p className="text-gray-400 mt-2">Waiting for host validation...</p>
+                        </div>
+                    </div>
+                )}
+            </div>
+            <p className="mt-6 text-gray-400 text-sm font-medium animate-pulse">Shh! Act it out without speaking.</p>
+        </div>
+    );
 };
 
 // --- MAIN COMPONENT ---
@@ -513,29 +548,11 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
               {(gameState.phase === 'acting' || gameState.phase === 'waiting_for_host') && (
                  <>
                    {gameState.actorId === playerId ? (
-                     <div className="absolute inset-0 bg-slate-900 text-white flex flex-col items-center justify-center p-6 animate-in slide-in-from-bottom z-30">
-                        <div className="w-full max-w-md bg-white text-slate-900 rounded-[32px] aspect-[3/4] flex flex-col items-center justify-center p-8 text-center shadow-2xl relative overflow-hidden">
-                            <div className="absolute top-0 w-full bg-slate-900 py-3 text-white font-mono font-bold text-xl flex items-center justify-center gap-2">
-                                <Clock size={18} /> {useGameTimer(gameState.roundEndsAt)}s
-                            </div>
-                            
-                            <p className="text-gray-400 font-bold uppercase tracking-widest text-xs mb-4 mt-8">Your Word</p>
-                            <h2 className="text-4xl sm:text-5xl font-black break-words leading-tight">{gameState.cards.find(c => c.id === gameState.activeCardId)?.word || "..."}</h2>
-                            
-                            {gameState.phase === 'waiting_for_host' && (
-                                <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6">
-                                    <div className="text-white text-center">
-                                        <div className="w-16 h-16 rounded-full border-4 border-rose-500 flex items-center justify-center mx-auto mb-4">
-                                            <span className="text-2xl font-bold text-rose-500">0</span>
-                                        </div>
-                                        <h3 className="text-2xl font-bold">Time's Up!</h3>
-                                        <p className="text-gray-400 mt-2">Waiting for host validation...</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                        <p className="mt-6 text-gray-400 text-sm font-medium animate-pulse">Shh! Act it out without speaking.</p>
-                     </div>
+                     <ActorView 
+                        word={gameState.cards.find(c => c.id === gameState.activeCardId)?.word || "..."}
+                        roundEndsAt={gameState.roundEndsAt}
+                        isWaiting={gameState.phase === 'waiting_for_host'}
+                     />
                    ) : (
                      <div className="absolute inset-0 z-20">
                         <SpectatorStage gameState={gameState} />
