@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { GameScreen, GameConfig } from './types';
 import GameCard from './components/GameCard';
@@ -5,6 +6,7 @@ import PassTheHat from './games/PassTheHat';
 import Charades from './games/Charades';
 import ScavengerHunt from './games/ScavengerHunt';
 import Trivia from './games/Trivia';
+import ConversationStarters from './games/ConversationStarters';
 import { Sparkles, ArrowRight } from 'lucide-react';
 import { syncService } from './services/syncService';
 
@@ -24,6 +26,14 @@ const GAMES: GameConfig[] = [
     icon: '🎭',
     color: '#8B5CF6', // Violet
     screen: GameScreen.CHARADES
+  },
+  {
+    id: 'conversation',
+    name: 'Ice Breakers',
+    description: 'Deep questions and fun debate topics to get the group talking.',
+    icon: '💬',
+    color: '#F59E0B', // Amber
+    screen: GameScreen.CONVERSATION
   },
   {
     id: 'scavenger',
@@ -100,6 +110,8 @@ const App: React.FC = () => {
         return <ScavengerHunt onBack={() => setCurrentScreen(GameScreen.HOME)} />;
       case GameScreen.TRIVIA:
         return <Trivia onBack={() => setCurrentScreen(GameScreen.HOME)} />;
+      case GameScreen.CONVERSATION:
+        return <ConversationStarters onBack={() => setCurrentScreen(GameScreen.HOME)} />;
       default:
         return (
           <div className="flex flex-col h-full relative z-10 overflow-hidden">
@@ -168,7 +180,7 @@ const App: React.FC = () => {
             {/* Brand Footer - Static Flex Item */}
             <div className="shrink-0 pb-6 pt-2 flex justify-center items-center gap-3 opacity-60 z-20">
                <span className="h-px w-8 bg-gray-400"></span>
-               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.25em]">Powered by LovenotesAI</span>
+               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.25em]">Powered by Google Gemini</span>
                <span className="h-px w-8 bg-gray-400"></span>
             </div>
           </div>

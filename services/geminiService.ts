@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { ChallengeResponse, ScavengerItem, TriviaQuestion } from "../types";
 
@@ -168,6 +169,44 @@ export const generateTrivia = async (topic: string): Promise<TriviaQuestion[]> =
       { question: "Which planet is known as the Red Planet?", answer: "Mars", category: "Space" },
       { question: "Who lives in a pineapple under the sea?", answer: "SpongeBob", category: "Cartoons" },
       { question: "What is the largest mammal?", answer: "Blue Whale", category: "Nature" },
+    ];
+  }
+};
+
+export const generateConversationStarters = async (vibe: string): Promise<string[]> => {
+  try {
+    const prompt = `Generate 12 engaging, distinct conversation starter questions.
+    Vibe: "${vibe}" (e.g. Deep, Funny, Spicy, Chill, Would You Rather).
+    Context: A group of friends hanging out.
+    If the vibe is "Would You Rather", ensure all questions follow the "Would you rather X or Y?" format.
+    Avoid standard boring questions like "How are you".
+    
+    Return a JSON array of strings.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
+        }
+      }
+    });
+
+    const text = response.text;
+    if (!text) throw new Error("No response from AI");
+    
+    return JSON.parse(text) as string[];
+  } catch (error) {
+    console.error("Gemini Conversation Error:", error);
+    return [
+      "If you could have dinner with any historical figure, who would it be?",
+      "What is your most controversial food opinion?",
+      "What's the best trip you've ever taken?",
+      "If you had to live in a movie universe, which one would it be?",
+      "What is a skill you'd love to learn instantly?"
     ];
   }
 };

@@ -1,13 +1,22 @@
 
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ThumbsUp, ThumbsDown, RefreshCw, Play, Settings2, Users, CreditCard, Share2, Trophy, Clock, ShieldCheck, Monitor, EyeOff, XCircle, Zap, Check } from 'lucide-react';
+import { ChevronLeft, ThumbsUp, ThumbsDown, RefreshCw, Play, Settings2, Users, CreditCard, Share2, Trophy, Clock, ShieldCheck, Monitor, EyeOff, XCircle, Zap, Check, Plus, Trash2 } from 'lucide-react';
 import { generateCharadesWords } from '../services/geminiService';
 import { syncService } from '../services/syncService';
 import { CharadesGameState, CharadesTeam, CharadesCard, GameNotification } from '../types';
 
 // --- Constants ---
 const CATEGORIES = ["Movies", "Animals", "Jobs", "Actions", "Famous People", "Objects", "Emotions", "Cartoon Characters"];
-const TEAM_COLORS = ["#EC4899", "#3B82F6", "#10B981", "#F59E0B"]; 
+const TEAM_COLORS = [
+  "#EC4899", // Pink
+  "#3B82F6", // Blue
+  "#10B981", // Emerald
+  "#F59E0B", // Amber
+  "#8B5CF6", // Violet
+  "#EF4444", // Red
+  "#06B6D4", // Cyan
+  "#F97316"  // Orange
+];
 
 // --- Hooks ---
 const useGameTimer = (roundEndsAt: number | null) => {
@@ -294,43 +303,69 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
     return () => clearInterval(interval);
   }, [gameRole, gameState?.phase, gameState?.roundEndsAt]);
 
+  const handleAddTeam = () => {
+    if (teams.length >= 8) return;
+    setTeams(prev => [
+        ...prev,
+        {
+            id: Date.now().toString(),
+            name: `Team ${prev.length + 1}`,
+            score: 0,
+            color: TEAM_COLORS[prev.length % TEAM_COLORS.length]
+        }
+    ]);
+  };
+
+  const handleRemoveTeam = (index: number) => {
+      if (teams.length <= 2) {
+          addNotification("Minimum 2 teams required", "error");
+          return;
+      }
+      setTeams(prev => prev.filter((_, i) => i !== index));
+  };
 
   const handleCreateGame = async () => {
     setIsLoading(true);
     const cat = customCategory || category;
-    const words = await generateCharadesWords(cat, numCards);
-    const roomId = Math.random().toString(36).substring(2, 6).toUpperCase();
     
-    const newCards: CharadesCard[] = words.map((w, i) => ({
-      id: `c${i}`,
-      word: w,
-      status: 'hidden'
-    }));
+    try {
+        const words = await generateCharadesWords(cat, numCards);
+        const roomId = Math.random().toString(36).substring(2, 6).toUpperCase();
+        
+        const newCards: CharadesCard[] = words.map((w, i) => ({
+          id: `c${i}`,
+          word: w,
+          status: 'hidden'
+        }));
 
-    const initialState: CharadesGameState = {
-      roomId,
-      phase: 'board',
-      teams,
-      currentTeamIndex: 0,
-      cards: newCards,
-      activeCardId: null,
-      roundEndsAt: null,
-      lastResult: null,
-      category: cat,
-      roundDuration
-    };
+        const initialState: CharadesGameState = {
+          roomId,
+          phase: 'board',
+          teams,
+          currentTeamIndex: 0,
+          cards: newCards,
+          activeCardId: null,
+          roundEndsAt: null,
+          lastResult: null,
+          category: cat,
+          roundDuration
+        };
 
-    const success = await syncService.createRoom(roomId, initialState);
-    
-    if (success) {
-        setGameState(initialState);
-        const newUrl = new URL(window.location.href);
-        newUrl.searchParams.set('gameId', roomId);
-        newUrl.searchParams.set('role', 'host');
-        window.history.pushState({}, '', newUrl);
-        setGameRole('host');
-    } else {
-        addNotification("Network Error", "error");
+        const success = await syncService.createRoom(roomId, initialState);
+        
+        if (success) {
+            setGameState(initialState);
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.set('gameId', roomId);
+            newUrl.searchParams.set('role', 'host');
+            window.history.pushState({}, '', newUrl);
+            setGameRole('host');
+        } else {
+            addNotification("Network Error: Could not create room", "error");
+        }
+    } catch (e) {
+        console.error(e);
+        addNotification("Failed to generate game. Try again.", "error");
     }
     setIsLoading(false);
   };
@@ -435,20 +470,43 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
         </div>
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
            <div className="bg-purple-800/40 p-5 rounded-2xl border border-purple-500/30">
-              <h3 className="font-bold uppercase tracking-wider text-sm flex items-center gap-2 mb-4"><Users size={16}/> Teams</h3>
+              <div className="flex items-center justify-between mb-4">
+                 <h3 className="font-bold uppercase tracking-wider text-sm flex items-center gap-2"><Users size={16}/> Teams</h3>
+                 <button onClick={handleAddTeam} className="bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors" disabled={teams.length >= 8}>
+                    <Plus size={16} />
+                 </button>
+              </div>
               <div className="space-y-3">
                  {teams.map((t, idx) => (
-                    <div key={idx} className="flex gap-2">
-                       <div className="w-4 rounded-full" style={{ backgroundColor: t.color }}></div>
-                       <input value={t.name} onChange={(e) => { const newTeams = [...teams]; newTeams[idx].name = e.target.value; setTeams(newTeams); }} className="flex-1 bg-white/10 rounded-lg px-4 py-2 outline-none focus:bg-white/20" />
+                    <div key={t.id} className="flex gap-2">
+                       <div className="w-4 rounded-full shrink-0 mt-3" style={{ backgroundColor: t.color }}></div>
+                       <input 
+                         value={t.name} 
+                         onChange={(e) => { const newTeams = [...teams]; newTeams[idx].name = e.target.value; setTeams(newTeams); }} 
+                         className="flex-1 bg-white/10 rounded-lg px-4 py-2 outline-none focus:bg-white/20 transition-colors"
+                         placeholder={`Team ${idx + 1}`}
+                       />
+                       {teams.length > 2 && (
+                           <button onClick={() => handleRemoveTeam(idx)} className="text-white/30 hover:text-white/80 p-2">
+                               <Trash2 size={16} />
+                           </button>
+                       )}
                     </div>
                  ))}
               </div>
            </div>
-           <div className="bg-purple-800/40 p-5 rounded-2xl border border-purple-500/30">
-               <h3 className="font-bold uppercase tracking-wider text-sm flex items-center gap-2 mb-4"><CreditCard size={16}/> Cards: {numCards}</h3>
-               <input type="range" min="4" max="24" step="2" value={numCards} onChange={(e) => setNumCards(Number(e.target.value))} className="w-full h-2 bg-purple-900 rounded-lg appearance-none cursor-pointer accent-white" />
+           
+           <div className="grid grid-cols-2 gap-4">
+               <div className="bg-purple-800/40 p-5 rounded-2xl border border-purple-500/30">
+                   <h3 className="font-bold uppercase tracking-wider text-sm flex items-center gap-2 mb-4"><CreditCard size={16}/> Cards</h3>
+                   <input type="number" min="4" max="50" value={numCards} onChange={(e) => setNumCards(Number(e.target.value))} className="w-full bg-white/10 rounded-lg px-3 py-2 outline-none font-bold" />
+               </div>
+               <div className="bg-purple-800/40 p-5 rounded-2xl border border-purple-500/30">
+                   <h3 className="font-bold uppercase tracking-wider text-sm flex items-center gap-2 mb-4"><Clock size={16}/> Secs</h3>
+                   <input type="number" min="10" max="300" value={roundDuration} onChange={(e) => setRoundDuration(Number(e.target.value))} className="w-full bg-white/10 rounded-lg px-3 py-2 outline-none font-bold" />
+               </div>
            </div>
+
            <div className="bg-purple-800/40 p-5 rounded-2xl border border-purple-500/30">
                <h3 className="font-bold uppercase tracking-wider text-sm flex items-center gap-2 mb-4"><Settings2 size={16}/> Topic</h3>
                <div className="flex flex-wrap gap-2 mb-4">
