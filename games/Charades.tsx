@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ThumbsUp, ThumbsDown, RefreshCw, Play, Settings2, Users, CreditCard, Share2, Trophy, Clock, ShieldCheck, Monitor, EyeOff, XCircle, Zap, Check, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, ThumbsUp, ThumbsDown, RefreshCw, Play, Settings2, Users, CreditCard, Share2, Trophy, Clock, ShieldCheck, Monitor, EyeOff, XCircle, Zap, Check, Plus, Trash2, History, Crown } from 'lucide-react';
 import { generateCharadesWords } from '../services/geminiService';
 import { syncService } from '../services/syncService';
 import { CharadesGameState, CharadesTeam, CharadesCard, GameNotification } from '../types';
@@ -143,46 +143,123 @@ const HostController: React.FC<{
 const SpectatorStage: React.FC<{ gameState: CharadesGameState }> = ({ gameState }) => {
   const activeTeam = gameState.teams[gameState.currentTeamIndex] || gameState.teams[0];
   const timeLeft = useGameTimer(gameState.roundEndsAt);
+  
+  // Data for Dashboard
+  const history = [...gameState.cards]
+    .filter(c => c.status === 'guessed' || c.status === 'skipped')
+    .reverse();
+    
+  const sortedTeams = [...gameState.teams].sort((a,b) => b.score - a.score);
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 text-white p-6 justify-center items-center text-center relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: activeTeam.color }}></div>
+    <div className="flex flex-col md:flex-row h-full bg-slate-900 text-white overflow-hidden">
       
-      {gameState.phase === 'board' && (
-        <div className="animate-in fade-in zoom-in duration-500">
-          <p className="text-gray-400 font-bold uppercase tracking-[0.2em] mb-4 text-xs">Waiting for action</p>
-          <h2 className="text-4xl sm:text-6xl font-black mb-8" style={{ color: activeTeam.color }}>{activeTeam.name}</h2>
-          <div className="inline-block px-6 py-2 rounded-full bg-white/10 text-sm animate-bounce">
-              Player is selecting a card...
-          </div>
-        </div>
-      )}
+      {/* LEFT: MAIN STAGE */}
+      <div className="flex-1 relative flex flex-col justify-center items-center p-6 border-b md:border-b-0 md:border-r border-white/10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-800 to-slate-900">
+          <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: activeTeam.color }}></div>
 
-      {(gameState.phase === 'acting' || gameState.phase === 'waiting_for_host') && (
-        <div className="w-full max-w-lg animate-in zoom-in duration-300 relative z-10">
-           <div className="p-8 sm:p-12 rounded-[32px] border-4 bg-black relative overflow-hidden shadow-2xl" style={{ borderColor: activeTeam.color }}>
-              <p className="text-gray-400 font-bold uppercase mb-4 text-xs tracking-widest">Acting Now</p>
-              <h2 className="text-4xl sm:text-5xl font-black mb-10 leading-tight" style={{ color: activeTeam.color }}>{activeTeam.name}</h2>
-              <div className="flex flex-col items-center justify-center mb-6">
-                 <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4 animate-pulse">
-                    <EyeOff size={32} className="text-gray-500" />
-                 </div>
-                 <p className="text-xl font-bold text-white">GUESS THE WORD!</p>
+          {gameState.phase === 'board' && (
+            <div className="animate-in fade-in zoom-in duration-500 text-center">
+              <div className="inline-block p-4 rounded-full bg-white/5 mb-6 animate-pulse">
+                  <Play size={40} className="text-white/50" fill="currentColor" />
               </div>
-              <div className={`text-7xl font-mono font-bold ${timeLeft <= 10 ? 'text-rose-500 animate-pulse' : 'text-white'}`}>
-                  {timeLeft}
+              <p className="text-gray-400 font-bold uppercase tracking-[0.2em] mb-4 text-xs">Up Next</p>
+              <h2 className="text-4xl sm:text-6xl font-black mb-8" style={{ color: activeTeam.color }}>{activeTeam.name}</h2>
+              <div className="inline-block px-6 py-2 rounded-full bg-white/10 text-sm">
+                  Waiting for player to select a card...
               </div>
-           </div>
-        </div>
-      )}
+            </div>
+          )}
 
-      {gameState.phase === 'result' && (
-        <div className="w-full max-w-md animate-in slide-in-from-bottom-10">
-          <div className={`p-10 rounded-[40px] shadow-2xl ${gameState.lastResult === 'guessed' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
-             <h2 className="text-6xl font-black text-white">{gameState.lastResult === 'guessed' ? 'YES!' : 'NO!'}</h2>
-          </div>
-        </div>
-      )}
+          {(gameState.phase === 'acting' || gameState.phase === 'waiting_for_host') && (
+            <div className="w-full max-w-lg animate-in zoom-in duration-300 relative z-10 text-center">
+              <div className="p-8 sm:p-12 rounded-[32px] border-4 bg-black relative overflow-hidden shadow-2xl ring-1 ring-white/10" style={{ borderColor: activeTeam.color }}>
+                  <p className="text-gray-400 font-bold uppercase mb-4 text-xs tracking-widest">Acting Now</p>
+                  <h2 className="text-4xl sm:text-5xl font-black mb-10 leading-tight" style={{ color: activeTeam.color }}>{activeTeam.name}</h2>
+                  <div className="flex flex-col items-center justify-center mb-6">
+                    <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4 animate-pulse">
+                        <EyeOff size={32} className="text-gray-500" />
+                    </div>
+                    <p className="text-xl font-bold text-white">GUESS THE WORD!</p>
+                  </div>
+                  <div className={`text-7xl font-mono font-bold ${timeLeft <= 10 ? 'text-rose-500 animate-pulse' : 'text-white'}`}>
+                      {timeLeft}
+                  </div>
+              </div>
+            </div>
+          )}
+
+          {gameState.phase === 'result' && (
+            <div className="w-full max-w-md animate-in slide-in-from-bottom-10 text-center">
+              <div className={`p-12 rounded-[40px] shadow-2xl ${gameState.lastResult === 'guessed' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                <h2 className="text-7xl font-black text-white">{gameState.lastResult === 'guessed' ? 'YES!' : 'NO!'}</h2>
+              </div>
+            </div>
+          )}
+          
+          {gameState.phase === 'summary' && (
+             <div className="text-center animate-bounce">
+                <Trophy size={80} className="text-yellow-400 mx-auto mb-4" />
+                <h1 className="text-5xl font-black">GAME OVER</h1>
+             </div>
+          )}
+      </div>
+
+      {/* RIGHT: DASHBOARD (History & Scores) */}
+      <div className="w-full md:w-80 lg:w-96 bg-black/20 backdrop-blur-sm flex flex-col h-[40vh] md:h-full shrink-0 border-l border-white/5">
+         
+         {/* Live Standings */}
+         <div className="p-4 border-b border-white/10 bg-black/20">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-2">
+                <Trophy size={14} /> Live Standings
+            </h3>
+            <div className="space-y-2">
+                {sortedTeams.map((team, idx) => (
+                    <div key={team.id} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 relative overflow-hidden group">
+                        <div className="absolute left-0 top-0 bottom-0 w-1 opacity-100" style={{ backgroundColor: team.color }}></div>
+                        <div className="flex items-center gap-3 pl-2">
+                            {idx === 0 ? <Crown size={16} className="text-yellow-400" fill="currentColor" /> : <span className="text-xs font-mono text-gray-500 w-4">#{idx+1}</span>}
+                            <span className="font-bold text-sm truncate max-w-[120px]" style={{ color: idx === 0 ? 'white' : 'lightgray' }}>{team.name}</span>
+                        </div>
+                        <span className="font-black text-xl">{team.score}</span>
+                    </div>
+                ))}
+            </div>
+         </div>
+
+         {/* Round History */}
+         <div className="flex-1 overflow-y-auto p-4 min-h-0">
+             <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-2 sticky top-0 bg-transparent backdrop-blur-md py-2 z-10">
+                <History size={14} /> Round History
+            </h3>
+            <div className="space-y-2">
+                {history.length === 0 && (
+                    <p className="text-center text-gray-600 text-xs py-4">No cards played yet</p>
+                )}
+                {history.map((card) => (
+                    <div key={card.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5 animate-in slide-in-from-right fade-in duration-300">
+                        <span className="font-medium text-sm text-gray-300">{card.word}</span>
+                        {card.status === 'guessed' ? (
+                            <div className="flex items-center gap-1 text-emerald-400 text-xs font-bold uppercase">
+                                <span>+1</span>
+                                <Check size={16} />
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-1 text-rose-400 text-xs font-bold uppercase">
+                                <span>Skip</span>
+                                <XCircle size={16} />
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+         </div>
+         
+         <div className="p-3 text-center border-t border-white/5">
+            <div className="text-[10px] text-gray-600 font-mono">ROOM: {gameState.roomId}</div>
+         </div>
+
+      </div>
     </div>
   );
 };
