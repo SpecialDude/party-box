@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ThumbsUp, ThumbsDown, RefreshCw, Play, Settings2, Users, CreditCard, Share2, Trophy, Clock, ShieldCheck, Monitor, EyeOff, XCircle, User, Zap } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronLeft, ThumbsUp, ThumbsDown, RefreshCw, Play, Settings2, Users, CreditCard, Share2, Trophy, Clock, ShieldCheck, Monitor, EyeOff, XCircle, User, Zap, Check } from 'lucide-react';
 import { generateCharadesWords } from '../services/geminiService';
 import { syncService } from '../services/syncService';
 import { CharadesGameState, CharadesTeam, CharadesCard, GameNotification } from '../types';
@@ -10,7 +10,7 @@ const CATEGORIES = ["Movies", "Animals", "Jobs", "Actions", "Famous People", "Ob
 const TEAM_COLORS = ["#EC4899", "#3B82F6", "#10B981", "#F59E0B"]; 
 
 // --- Hooks ---
-const useGameTimer = (roundEndsAt: number | null, onExpire?: () => void) => {
+const useGameTimer = (roundEndsAt: number | null) => {
   const [timeLeft, setTimeLeft] = useState(0);
 
   useEffect(() => {
@@ -21,17 +21,12 @@ const useGameTimer = (roundEndsAt: number | null, onExpire?: () => void) => {
     const tick = () => {
       const now = Date.now();
       const diff = Math.ceil((roundEndsAt - now) / 1000);
-      if (diff <= 0) {
-        setTimeLeft(0);
-        if (onExpire) onExpire();
-      } else {
-        setTimeLeft(diff);
-      }
+      setTimeLeft(diff > 0 ? diff : 0);
     };
-    tick(); // Run immediately
+    tick();
     const interval = setInterval(tick, 200);
     return () => clearInterval(interval);
-  }, [roundEndsAt]); // intentionally removed onExpire from deps to prevent loop if function unstable
+  }, [roundEndsAt]);
 
   return timeLeft;
 };
@@ -39,10 +34,10 @@ const useGameTimer = (roundEndsAt: number | null, onExpire?: () => void) => {
 // --- Sub Components ---
 
 const NotificationToast: React.FC<{ notifications: GameNotification[] }> = ({ notifications }) => (
-  <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-full max-w-sm px-4 pointer-events-none">
+  <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-full max-w-xs px-4 pointer-events-none">
     {notifications.map(n => (
-      <div key={n.id} className={`p-4 rounded-xl shadow-xl flex items-center justify-center font-bold text-white animate-in slide-in-from-top-2 fade-in ${
-        n.type === 'success' ? 'bg-emerald-500' : n.type === 'error' ? 'bg-rose-500' : 'bg-blue-600'
+      <div key={n.id} className={`p-3 rounded-lg shadow-lg flex items-center justify-center font-bold text-white text-sm animate-in slide-in-from-top-2 fade-in ${
+        n.type === 'success' ? 'bg-emerald-500' : n.type === 'error' ? 'bg-rose-500' : 'bg-slate-800'
       }`}>
         {n.message}
       </div>
@@ -64,7 +59,7 @@ const HostController: React.FC<{
       <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-4">
         <div className="flex items-center gap-2">
             <ShieldCheck className="text-emerald-400" size={20} />
-            <h1 className="font-bold uppercase tracking-widest text-xs text-gray-400">Host</h1>
+            <h1 className="font-bold uppercase tracking-widest text-xs text-gray-400">Host Control</h1>
         </div>
         <div className="font-mono text-lg font-bold bg-white/10 px-3 py-1 rounded-lg tracking-wider">
            {gameState.roomId}
@@ -73,8 +68,10 @@ const HostController: React.FC<{
 
       {gameState.phase === 'board' && (
          <div className="flex-1 flex flex-col items-center justify-center text-center opacity-50 space-y-4">
-            <Clock size={48} />
-            <p className="text-xl font-medium">Waiting for player selection...</p>
+            <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center">
+                <Clock size={32} />
+            </div>
+            <p className="text-xl font-medium">Waiting for player to pick a card...</p>
             <div className="text-sm bg-white/10 px-4 py-2 rounded-full">
                Current Turn: <span style={{ color: activeTeam.color }}>{activeTeam.name}</span>
             </div>
@@ -82,41 +79,42 @@ const HostController: React.FC<{
       )}
 
       {(gameState.phase === 'acting' || gameState.phase === 'waiting_for_host') && (
-        <div className="flex-1 flex flex-col">
-           <div className="text-center mb-6 flex-1 flex flex-col justify-center bg-white/5 rounded-3xl p-4 border border-white/10 relative overflow-hidden">
-              <span className="text-gray-400 text-xs font-bold uppercase block mb-4">Target Word</span>
-              <h2 className="text-4xl font-black text-white mb-4 leading-tight break-words">{activeCard?.word || '???'}</h2>
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <div className="w-2 h-2 rounded-full" style={{ color: activeTeam.color, backgroundColor: activeTeam.color }}></div>
-                <span className="text-sm font-bold opacity-80">{activeTeam.name}</span>
+        <div className="flex-1 flex flex-col max-h-full">
+           <div className="text-center mb-4 flex-1 flex flex-col justify-center bg-white/5 rounded-3xl p-4 border border-white/10 relative overflow-hidden">
+              <span className="text-gray-400 text-xs font-bold uppercase block mb-2">The Word Is</span>
+              <h2 className="text-3xl sm:text-5xl font-black text-white mb-4 leading-tight break-words">{activeCard?.word || '???'}</h2>
+              
+              <div className="flex items-center justify-center gap-2 mb-4 bg-black/30 w-fit mx-auto px-4 py-1 rounded-full">
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: activeTeam.color }}></div>
+                <span className="text-xs font-bold opacity-80 uppercase tracking-wide">{activeTeam.name} Acting</span>
               </div>
               
-              <button onClick={onCancel} className="absolute top-4 right-4 text-gray-600 hover:text-rose-500 p-2">
-                  <XCircle size={24} />
+              <button onClick={onCancel} className="absolute top-2 right-2 text-gray-600 hover:text-rose-500 p-2 bg-black/20 rounded-full">
+                  <XCircle size={20} />
               </button>
            </div>
 
            <div className="flex items-center justify-center gap-3 mb-6">
               <Clock className={timeLeft <= 5 ? 'text-rose-500 animate-pulse' : 'text-blue-400'} size={24} />
-              <div className={`text-5xl font-mono font-bold ${timeLeft <= 5 ? 'text-rose-500' : 'text-white'}`}>
-                {timeLeft}s
+              <div className={`text-6xl font-mono font-bold ${timeLeft <= 5 ? 'text-rose-500' : 'text-white'}`}>
+                {timeLeft}
               </div>
            </div>
 
-           <div className="grid grid-cols-2 gap-4 mt-auto h-32">
+           <div className="grid grid-cols-2 gap-4 mt-auto h-24 shrink-0">
               <button 
                 onClick={() => onValidate('skipped')}
-                className="bg-rose-500/10 border-2 border-rose-500 text-rose-500 rounded-2xl font-bold flex flex-col items-center justify-center gap-2 active:bg-rose-500 active:text-white transition-all"
+                className="bg-rose-500/10 border-2 border-rose-500 text-rose-500 rounded-2xl font-bold flex flex-col items-center justify-center gap-1 active:bg-rose-500 active:text-white transition-all"
               >
-                <ThumbsDown size={32} />
-                <span>Skip / Miss</span>
+                <ThumbsDown size={28} />
+                <span className="text-sm">Skip</span>
               </button>
               <button 
                 onClick={() => onValidate('guessed')}
-                className="bg-emerald-500/10 border-2 border-emerald-500 text-emerald-500 rounded-2xl font-bold flex flex-col items-center justify-center gap-2 active:bg-emerald-500 active:text-white transition-all"
+                className="bg-emerald-500/10 border-2 border-emerald-500 text-emerald-500 rounded-2xl font-bold flex flex-col items-center justify-center gap-1 active:bg-emerald-500 active:text-white transition-all"
               >
-                <ThumbsUp size={32} />
-                <span>Got it!</span>
+                <ThumbsUp size={28} />
+                <span className="text-sm">Correct</span>
               </button>
            </div>
         </div>
@@ -124,7 +122,7 @@ const HostController: React.FC<{
 
       {gameState.phase === 'result' && (
         <div className="flex-1 flex flex-col items-center justify-center animate-pulse">
-            <h2 className={`text-4xl font-black ${gameState.lastResult === 'guessed' ? 'text-emerald-400' : 'text-rose-400'}`}>
+            <h2 className={`text-5xl font-black ${gameState.lastResult === 'guessed' ? 'text-emerald-400' : 'text-rose-400'}`}>
                 {gameState.lastResult === 'guessed' ? 'SCORED!' : 'MISSED'}
             </h2>
         </div>
@@ -139,30 +137,30 @@ const SpectatorStage: React.FC<{ gameState: CharadesGameState }> = ({ gameState 
 
   return (
     <div className="flex flex-col h-full bg-slate-900 text-white p-6 justify-center items-center text-center relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-2" style={{ backgroundColor: activeTeam.color }}></div>
+      <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: activeTeam.color }}></div>
       
       {gameState.phase === 'board' && (
         <div className="animate-in fade-in zoom-in duration-500">
-          <p className="text-gray-400 font-bold uppercase tracking-[0.2em] mb-4">Up Next</p>
-          <h2 className="text-6xl font-black mb-8" style={{ color: activeTeam.color }}>{activeTeam.name}</h2>
+          <p className="text-gray-400 font-bold uppercase tracking-[0.2em] mb-4 text-xs">Waiting for action</p>
+          <h2 className="text-4xl sm:text-6xl font-black mb-8" style={{ color: activeTeam.color }}>{activeTeam.name}</h2>
           <div className="inline-block px-6 py-2 rounded-full bg-white/10 text-sm animate-bounce">
-              Someone select a card!
+              Player is selecting a card...
           </div>
         </div>
       )}
 
       {(gameState.phase === 'acting' || gameState.phase === 'waiting_for_host') && (
         <div className="w-full max-w-lg animate-in zoom-in duration-300 relative z-10">
-           <div className="p-10 rounded-[40px] border-4 bg-black relative overflow-hidden shadow-2xl" style={{ borderColor: activeTeam.color }}>
-              <p className="text-gray-400 font-bold uppercase mb-4">Acting Now</p>
-              <h2 className="text-5xl font-black mb-10" style={{ color: activeTeam.color }}>{activeTeam.name}</h2>
-              <div className="flex flex-col items-center justify-center mb-4">
-                 <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-4 animate-pulse">
-                    <EyeOff size={40} className="text-gray-500" />
+           <div className="p-8 sm:p-12 rounded-[32px] border-4 bg-black relative overflow-hidden shadow-2xl" style={{ borderColor: activeTeam.color }}>
+              <p className="text-gray-400 font-bold uppercase mb-4 text-xs tracking-widest">Acting Now</p>
+              <h2 className="text-4xl sm:text-5xl font-black mb-10 leading-tight" style={{ color: activeTeam.color }}>{activeTeam.name}</h2>
+              <div className="flex flex-col items-center justify-center mb-6">
+                 <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4 animate-pulse">
+                    <EyeOff size={32} className="text-gray-500" />
                  </div>
-                 <p className="text-2xl font-bold text-white">GUESS!</p>
+                 <p className="text-xl font-bold text-white">GUESS THE WORD!</p>
               </div>
-              <div className={`text-8xl font-mono font-bold ${timeLeft <= 10 ? 'text-rose-500 animate-pulse' : 'text-white'}`}>
+              <div className={`text-7xl font-mono font-bold ${timeLeft <= 10 ? 'text-rose-500 animate-pulse' : 'text-white'}`}>
                   {timeLeft}
               </div>
            </div>
@@ -183,7 +181,6 @@ const SpectatorStage: React.FC<{ gameState: CharadesGameState }> = ({ gameState 
 // --- MAIN COMPONENT ---
 
 const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onBack, isSpectator = false }) => {
-  // Local Settings
   const [category, setCategory] = useState("Movies");
   const [customCategory, setCustomCategory] = useState("");
   const [numCards, setNumCards] = useState(12);
@@ -196,7 +193,7 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
   const [gameRole, setGameRole] = useState<'host' | 'player' | 'spectator' | 'setup'>('setup');
   const [notifications, setNotifications] = useState<GameNotification[]>([]);
   
-  // Player ID - Ensure persistent per session
+  // Persistent Player ID
   const [playerId] = useState(() => {
     let id = sessionStorage.getItem('ppb_player_id');
     if (!id) {
@@ -211,7 +208,7 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
   const addNotification = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
       const id = Date.now().toString();
       setNotifications(prev => [...prev, { id, message, type }]);
-      setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 3000);
+      setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 2000);
   };
 
   useEffect(() => {
@@ -223,12 +220,12 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
        console.log("Connecting to game:", gameId);
        const unsubscribe = syncService.subscribe(gameId, (newState) => {
           if (!newState) {
-              addNotification("Game room closed or invalid", "error");
+              addNotification("Game room closed", "error");
               setGameState(null);
               return;
           }
           setGameState(prev => {
-              // Haptic feedback
+              // Haptic feedback for state changes
               if (prev?.phase !== newState.phase && navigator.vibrate) {
                   if (newState.phase === 'result') navigator.vibrate(200);
                   if (newState.phase === 'acting') navigator.vibrate(100);
@@ -245,7 +242,7 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
     }
   }, [isSpectator]);
 
-  // Host auto-check for time expiry
+  // Host timer check
   useEffect(() => {
     if (gameRole !== 'host' || !gameState || !gameState.roundEndsAt) return;
     if (gameState.phase !== 'acting') return;
@@ -258,7 +255,7 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
             });
             clearInterval(interval);
         }
-    }, 1000);
+    }, 500);
     return () => clearInterval(interval);
   }, [gameRole, gameState?.phase, gameState?.roundEndsAt]);
 
@@ -267,8 +264,6 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
     setIsLoading(true);
     const cat = customCategory || category;
     const words = await generateCharadesWords(cat, numCards);
-    
-    // Generate simple 4 letter code
     const roomId = Math.random().toString(36).substring(2, 6).toUpperCase();
     
     const newCards: CharadesCard[] = words.map((w, i) => ({
@@ -300,7 +295,7 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
         window.history.pushState({}, '', newUrl);
         setGameRole('host');
     } else {
-        addNotification("Could not create room", "error");
+        addNotification("Network Error", "error");
     }
     setIsLoading(false);
   };
@@ -308,19 +303,18 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
   const handleCardClick = (cardId: string) => {
     if (!gameState || gameState.phase !== 'board') return;
 
-    // Use Host time concept: current time + duration
     const endTime = Date.now() + (gameState.roundDuration * 1000);
-    
-    // Prepare Updated Cards Array
-    // Note: We use .map to create a new array, ensuring Firebase receives an Array structure
     const updatedCards = gameState.cards.map(c => 
         c.id === cardId ? { ...c, status: 'active' as const } : c
     );
 
+    // Optimistic Update
+    setGameState(prev => prev ? ({ ...prev, phase: 'acting', activeCardId: cardId, actorId: playerId }) : null);
+
     syncService.updateState(gameState.roomId, {
       phase: 'acting',
       activeCardId: cardId,
-      actorId: playerId, // Claim this turn
+      actorId: playerId, // IMPORTANT: Set Actor ID
       roundEndsAt: endTime,
       cards: updatedCards
     });
@@ -382,7 +376,7 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
     url.searchParams.set('role', role);
     url.searchParams.set('gameId', gameState?.roomId || ''); 
     navigator.clipboard.writeText(url.toString());
-    addNotification(`${role === 'player' ? 'Player' : 'Screen'} link copied!`, "success");
+    addNotification(`Copied ${role === 'player' ? 'Player' : 'Screen'} Link`, "success");
   };
 
   // --- Renderers ---
@@ -391,12 +385,12 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
     return (
       <div className="h-full flex flex-col items-center justify-center bg-[#8B5CF6] text-white">
         <RefreshCw className="animate-spin mb-4" size={40} />
-        <h2 className="text-xl font-bold">Creating Game Room...</h2>
+        <h2 className="text-xl font-bold">Setting up...</h2>
       </div>
     );
   }
 
-  // 1. Setup Screen
+  // 1. SETUP
   if (gameRole === 'setup') {
     return (
       <div className="flex flex-col h-full bg-[#8B5CF6] text-white overflow-hidden">
@@ -439,98 +433,111 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
     );
   }
 
-  // 2. Loading State
-  if (!gameState) return <div className="h-full flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center"><RefreshCw className="animate-spin mb-4" size={40} /><h2 className="text-xl font-bold">Joining Room...</h2></div>;
+  if (!gameState) return <div className="h-full flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center"><RefreshCw className="animate-spin mb-4" size={40} /><h2 className="text-xl font-bold">Loading...</h2></div>;
 
-  // 3. Game Views
+  // 2. ACTIVE GAME
   return (
-    <div className="h-full relative overflow-hidden">
+    <div className="h-full relative overflow-hidden bg-slate-100 flex flex-col">
       <NotificationToast notifications={notifications} />
 
       {gameRole === 'spectator' && <SpectatorStage gameState={gameState} />}
 
       {gameRole === 'host' && (
-        <div className="flex flex-col h-full">
-            <HostController gameState={gameState} onValidate={handleHostValidation} onCancel={handleCancelRound} />
-            {gameState.phase === 'board' && (
-              <div className="bg-slate-800 p-4 border-t border-white/10 flex justify-center gap-4">
+        <>
+           <HostController gameState={gameState} onValidate={handleHostValidation} onCancel={handleCancelRound} />
+           {gameState.phase === 'board' && (
+              <div className="bg-slate-800 p-4 border-t border-white/10 flex justify-center gap-4 shrink-0">
                   <button onClick={() => copyLink('player')} className="px-4 py-3 bg-white/10 rounded-full text-xs font-bold text-gray-300 flex items-center gap-2 hover:bg-white/20"><Share2 size={14} /> Link</button>
-                  <button onClick={() => copyLink('spectator')} className="px-4 py-3 bg-white/10 rounded-full text-xs font-bold text-gray-300 flex items-center gap-2 hover:bg-white/20"><Monitor size={14} /> TV</button>
+                  <button onClick={() => copyLink('spectator')} className="px-4 py-3 bg-white/10 rounded-full text-xs font-bold text-gray-300 flex items-center gap-2 hover:bg-white/20"><Monitor size={14} /> Screen</button>
               </div>
             )}
-        </div>
+        </>
       )}
 
       {gameRole === 'player' && (
         <>
-           <div className="h-14 flex items-center justify-between px-6 bg-[#8B5CF6] text-white shadow-sm z-10 relative">
+           {/* Top Info Bar */}
+           <div className="h-14 shrink-0 flex items-center justify-between px-6 bg-[#8B5CF6] text-white shadow-md z-20 relative">
                <div className="flex items-center gap-2">
-                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: gameState.teams[gameState.currentTeamIndex]?.color || '#fff' }}></div>
-                   <span className="font-bold truncate max-w-[120px]">{gameState.teams[gameState.currentTeamIndex]?.name || 'Team'}</span>
+                   <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: gameState.teams[gameState.currentTeamIndex]?.color || '#fff' }}></div>
+                   <span className="font-bold truncate max-w-[120px] text-sm">{gameState.teams[gameState.currentTeamIndex]?.name || 'Team'}'s Turn</span>
                </div>
-               <div className="flex items-center gap-2">
-                   <div className="bg-black/20 p-1.5 rounded-full"><User size={14} /></div>
+               <div className="bg-white/20 px-3 py-1 rounded-full flex items-center gap-2">
+                   <span className="text-xs font-bold opacity-80 uppercase tracking-wider">Score</span>
+                   <span className="font-mono font-bold">{gameState.teams[gameState.currentTeamIndex]?.score || 0}</span>
                </div>
            </div>
 
-           <div className="flex-1 bg-slate-100 p-4 overflow-hidden relative">
+           {/* Game Container */}
+           <div className="flex-1 relative overflow-hidden">
               
-              {/* BOARD PHASE */}
+              {/* BOARD PHASE - GRID */}
               {gameState.phase === 'board' && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 h-full overflow-y-auto pb-safe content-start">
-                      {gameState.cards.map((card) => (
-                        <button
-                            key={card.id}
-                            disabled={card.status !== 'hidden'}
-                            onClick={() => handleCardClick(card.id)}
-                            className={`aspect-square rounded-2xl flex items-center justify-center relative shadow-sm transition-all active:scale-95 ${
-                                card.status === 'hidden' 
-                                ? 'bg-white text-[#8B5CF6] hover:shadow-md border-b-4 border-gray-200' 
-                                : 'bg-gray-200 border-none opacity-50'
-                            }`}
-                        >
-                            {card.status === 'hidden' ? (
-                                <Zap size={32} className="opacity-20" />
-                            ) : (
-                                <div className={`absolute inset-0 rounded-2xl flex items-center justify-center ${
-                                    card.status === 'guessed' ? 'bg-emerald-500/80 text-white' : 'bg-rose-500/80 text-white'
-                                }`}>
-                                    {card.status === 'guessed' ? <ThumbsUp size={24} /> : <ThumbsDown size={24} />}
-                                </div>
-                            )}
-                        </button>
-                      ))}
-                  </div>
+                 <div className="absolute inset-0 overflow-y-auto p-4 pb-20">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 content-start">
+                        {gameState.cards.map((card) => (
+                          <button
+                              key={card.id}
+                              disabled={card.status !== 'hidden'}
+                              onClick={() => handleCardClick(card.id)}
+                              className={`aspect-[3/4] rounded-xl flex flex-col items-center justify-center relative shadow-sm transition-all active:scale-95 ${
+                                  card.status === 'hidden' 
+                                  ? 'bg-white text-[#8B5CF6] hover:shadow-md border-b-4 border-gray-200 hover:-translate-y-1' 
+                                  : 'bg-gray-200 border-none opacity-40 grayscale'
+                              }`}
+                          >
+                              {card.status === 'hidden' ? (
+                                  <>
+                                    <span className="text-xs font-bold uppercase text-gray-300 absolute top-2 left-2">Charades</span>
+                                    <Zap size={28} className="opacity-20 mb-2" />
+                                    <span className="font-black text-2xl opacity-10">?</span>
+                                  </>
+                              ) : (
+                                  <div className={`absolute inset-0 rounded-xl flex items-center justify-center ${
+                                      card.status === 'guessed' ? 'bg-emerald-500/80 text-white' : 'bg-rose-500/80 text-white'
+                                  }`}>
+                                      {card.status === 'guessed' ? <Check size={32} /> : <XCircle size={32} />}
+                                  </div>
+                              )}
+                          </button>
+                        ))}
+                    </div>
+                    
+                    <div className="mt-8 text-center px-6 py-4 bg-white/50 rounded-2xl">
+                        <p className="text-gray-500 text-sm font-medium">Tap a card to start your turn!</p>
+                    </div>
+                 </div>
               )}
 
               {/* ACTING PHASE */}
               {(gameState.phase === 'acting' || gameState.phase === 'waiting_for_host') && (
                  <>
-                   {/* Checks if local Player ID matches the one saved in Firebase */}
                    {gameState.actorId === playerId ? (
-                     <div className="absolute inset-0 bg-slate-900 text-white flex flex-col items-center justify-center p-6 animate-in slide-in-from-bottom z-20">
-                        <div className="w-full max-w-md bg-white text-slate-900 rounded-[3rem] aspect-[4/5] flex flex-col items-center justify-center p-8 text-center shadow-2xl relative overflow-hidden">
-                            <div className="absolute top-0 w-full bg-slate-900 py-3 text-white font-mono font-bold text-xl">
-                                {useGameTimer(gameState.roundEndsAt)}s
+                     <div className="absolute inset-0 bg-slate-900 text-white flex flex-col items-center justify-center p-6 animate-in slide-in-from-bottom z-30">
+                        <div className="w-full max-w-md bg-white text-slate-900 rounded-[32px] aspect-[3/4] flex flex-col items-center justify-center p-8 text-center shadow-2xl relative overflow-hidden">
+                            <div className="absolute top-0 w-full bg-slate-900 py-3 text-white font-mono font-bold text-xl flex items-center justify-center gap-2">
+                                <Clock size={18} /> {useGameTimer(gameState.roundEndsAt)}s
                             </div>
                             
                             <p className="text-gray-400 font-bold uppercase tracking-widest text-xs mb-4 mt-8">Your Word</p>
-                            <h2 className="text-4xl sm:text-5xl font-black break-words leading-tight">{gameState.cards.find(c => c.id === gameState.activeCardId)?.word || "Loading..."}</h2>
+                            <h2 className="text-4xl sm:text-5xl font-black break-words leading-tight">{gameState.cards.find(c => c.id === gameState.activeCardId)?.word || "..."}</h2>
                             
                             {gameState.phase === 'waiting_for_host' && (
-                                <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+                                <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6">
                                     <div className="text-white text-center">
-                                        <Clock size={48} className="mx-auto mb-4 text-rose-500 animate-pulse" />
+                                        <div className="w-16 h-16 rounded-full border-4 border-rose-500 flex items-center justify-center mx-auto mb-4">
+                                            <span className="text-2xl font-bold text-rose-500">0</span>
+                                        </div>
                                         <h3 className="text-2xl font-bold">Time's Up!</h3>
+                                        <p className="text-gray-400 mt-2">Waiting for host validation...</p>
                                     </div>
                                 </div>
                             )}
                         </div>
-                        <p className="mt-6 text-gray-400 text-sm font-medium">Act it out! Host will judge.</p>
+                        <p className="mt-6 text-gray-400 text-sm font-medium animate-pulse">Shh! Act it out without speaking.</p>
                      </div>
                    ) : (
-                     /* Not the actor? Show passive screen */
-                     <div className="absolute inset-0 z-10">
+                     <div className="absolute inset-0 z-20">
                         <SpectatorStage gameState={gameState} />
                      </div>
                    )}
@@ -550,7 +557,7 @@ const Charades: React.FC<{ onBack: () => void; isSpectator?: boolean }> = ({ onB
         </>
       )}
 
-      {/* Summary / Game Over */}
+      {/* Summary */}
       {gameState.phase === 'summary' && (
          <div className="absolute inset-0 bg-[#8B5CF6] text-white flex flex-col items-center justify-center p-6 text-center z-[60]">
              <Trophy size={64} className="text-yellow-300 mb-6 animate-bounce" />
