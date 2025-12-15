@@ -1,3 +1,4 @@
+
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -10,6 +11,8 @@ export default defineConfig(({ mode }) => {
       // Map the VITE_GEMINI_API_KEY to process.env.API_KEY 
       // to satisfy the Google GenAI SDK requirements.
       'process.env.API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY),
+      // Map the Model Name
+      'process.env.GEMINI_MODEL': JSON.stringify(env.VITE_GEMINI_MODEL),
       // Map Firebase configuration keys
       'process.env.FIREBASE_API_KEY': JSON.stringify(env.VITE_FIREBASE_API_KEY),
       'process.env.FIREBASE_AUTH_DOMAIN': JSON.stringify(env.VITE_FIREBASE_AUTH_DOMAIN),

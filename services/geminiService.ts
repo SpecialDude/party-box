@@ -5,6 +5,9 @@ import { ChallengeResponse, ScavengerItem, TriviaQuestion } from "../types";
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+// Use environment variable for model, fallback to 2.5-flash if not set
+const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
 const SYSTEM_INSTRUCTION = `
 You are a party game facilitator for a game called "Pass the Hat" (similar to Hot Potato).
 Your goal is to generate fun, safe, and engaging "penalties" or "challenges" for the person holding the object when the music stops.
@@ -23,7 +26,7 @@ export const generateChallenge = async (theme: string, previousChallenges: strin
     Theme context: ${theme || 'General Fun'}.${exclusionContext}`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: MODEL_NAME,
       contents: prompt,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -65,7 +68,7 @@ export const generateCharadesWords = async (category: string, count: number = 12
     Return ONLY a raw JSON array of strings.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: MODEL_NAME,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -106,7 +109,7 @@ export const generateScavengerHunt = async (location: string): Promise<Scavenger
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: MODEL_NAME,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -149,7 +152,7 @@ export const generateTrivia = async (topic: string): Promise<TriviaQuestion[]> =
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: MODEL_NAME,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -184,7 +187,7 @@ export const generateConversationStarters = async (vibe: string): Promise<string
     Return a JSON array of strings.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: MODEL_NAME,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
